@@ -1,0 +1,103 @@
+name: npm
+
+# Publishes the three TS client packages to npmjs.org with provenance:
+#   @geomqtt/core, @geomqtt/leaflet, @geomqtt/maplibre
+#
+# Triggers:
+#   * Push of a tag matching v* — auto-publishes that version.
+#   * Manual dispatch from the Actions UI — pick a version + optional dry-run.
+#     Use this for the very first publish, for prereleases, or to retry after a
+#     failed run without having to retag.
+#
+# One-time setup on this repo:
+#   1. Create / claim the `@geomqtt` scope on https://www.npmjs.com.
+#   2. Generate an automation token:    npm token create --automation
+#   3. Add it as a repository secret named NPM_TOKEN
+#      (Settings → Secrets and variables → Actions → New repository secret).
+#   4. Optional: enable npm package linkage at https://www.npmjs.com/settings/<user>/tokens
+#      so provenance attestations show on the package page.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (e.g. 0.1.0). Leading "v" is stripped.'
+        required: true
+        type: string
+      dry_run:
+        description: 'Dry run — pack and validate, do not push to npm.'
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: npm-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: npm publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write   # required by npm provenance attestations
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Resolve version
+        id: ver
+        run: |
+          set -euo pipefail
+          input='${{ github.event.inputs.version }}'
+          if [[ -n "$input" ]]; then
+            v="$input"
+          else
+            v="${GITHUB_REF_NAME}"
+          fi
+          v="${v#v}"
+          if [[ -z "$v" ]]; then
+            echo "could not resolve a version to publish" >&2
+            exit 1
+          fi
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "publishing version: $v"
+
+      - name: Bump workspace versions
+        working-directory: clients
+        run: |
+          set -euo pipefail
+          v='${{ steps.ver.outputs.version }}'
+          for pkg in geomqtt-core geomqtt-leaflet geomqtt-maplibre; do
+            (cd "$pkg" && npm version --no-git-tag-version --allow-same-version "$v")
+          done
+
+      - name: Install and build
+        working-directory: clients
+        run: |
+          npm install
+          npm run build
+
+      - name: Publish (in dependency order)
+        working-directory: clients
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+          dry_flag=""
+          if [[ '${{ github.event.inputs.dry_run }}' == 'true' ]]; then
+            dry_flag="--dry-run"
+            echo "::notice::dry run — no packages will be pushed"
+          fi
+          for pkg in geomqtt-core geomqtt-leaflet geomqtt-maplibre; do
+            echo "::group::publish @geomqtt/${pkg#geomqtt-}"
+            (cd "$pkg" && npm publish --access public --provenance $dry_flag)
+            echo "::endgroup::"
+          done

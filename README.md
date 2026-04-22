@@ -8,6 +8,7 @@ moving viewport by subscribing to the tiles it can see.**
 
 [![ci](https://github.com/openfantasymap/geomqtt/actions/workflows/ci.yml/badge.svg)](https://github.com/openfantasymap/geomqtt/actions/workflows/ci.yml)
 [![tests](https://github.com/openfantasymap/geomqtt/actions/workflows/tests.yml/badge.svg)](https://github.com/openfantasymap/geomqtt/actions/workflows/tests.yml)
+[![npm](https://github.com/openfantasymap/geomqtt/actions/workflows/npm.yml/badge.svg)](https://github.com/openfantasymap/geomqtt/actions/workflows/npm.yml)
 [![release](https://github.com/openfantasymap/geomqtt/actions/workflows/release.yml/badge.svg)](https://github.com/openfantasymap/geomqtt/actions/workflows/release.yml)
 [![ghcr](https://img.shields.io/badge/ghcr.io-openfantasymap%2Fgeomqtt-2b3137?logo=docker)](https://github.com/openfantasymap/geomqtt/pkgs/container/geomqtt)
 [![npm core](https://img.shields.io/npm/v/%40geomqtt%2Fcore?label=%40geomqtt%2Fcore&logo=npm)](https://www.npmjs.com/package/@geomqtt/core)
@@ -76,7 +77,7 @@ Pick the channel that matches how you're going to run or talk to geomqtt:
 |---------------------------|------------------------------------------------------------------------------|
 | **Docker (multi-arch)**   | `docker pull ghcr.io/openfantasymap/geomqtt:latest`                          |
 | **Binaries**              | [GitHub Releases](https://github.com/openfantasymap/geomqtt/releases) — Linux / macOS / Windows, x86_64 + aarch64 |
-| **npm — core library**    | `npm install @geomqtt/core`                                                  |
+| **npm — core library**    | `npm install @geomqtt/core` *(published by [npm.yml](.github/workflows/npm.yml) on tag push or manual dispatch — needs `NPM_TOKEN` repo secret)* |
 | **npm — Leaflet adapter** | `npm install @geomqtt/leaflet`                                               |
 | **npm — MapLibre adapter**| `npm install @geomqtt/maplibre`                                              |
 | **Unity (UPM)**           | Add `https://github.com/openfantasymap/geomqtt.git#upm/v0.1.0` to `manifest.json` |
@@ -161,7 +162,8 @@ npm run build
 ├── .github/workflows/
 │   ├── ci.yml                  # Rust fmt + clippy, TS build + typecheck
 │   ├── tests.yml               # Rust unit + integration (Redis service), TS vitest
-│   └── release.yml             # binaries + Docker + npm + UPM branch
+│   ├── npm.yml                 # Publishes @geomqtt/* — auto on tag, manual via dispatch
+│   └── release.yml             # Cross-platform binaries + Docker (GHCR) + UPM branch
 ├── Dockerfile
 ├── docker-compose.yml
 ├── PROTOCOL.md                 # wire contract

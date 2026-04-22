@@ -6,12 +6,12 @@ name: release
 #   * Cross-platform server binaries attached to the GitHub Release
 #     (linux-x86_64, linux-aarch64, macos-x86_64, macos-aarch64, windows-x86_64)
 #   * Multi-arch Docker image on GHCR: ghcr.io/<owner>/geomqtt:<version>
-#   * npm packages @geomqtt/core, @geomqtt/leaflet, @geomqtt/maplibre (with provenance)
 #   * A dedicated `upm` branch + `upm/<tag>` tag so Unity users can install via
 #     https://github.com/<owner>/<repo>.git#upm/v0.1.0
 #
-# Secrets required:
-#   NPM_TOKEN — npm automation token (only if publishing to npmjs)
+# npm publishing of @geomqtt/* lives in npm.yml so it can also be triggered
+# manually for prereleases / republishes without retagging.
+#
 # GITHUB_TOKEN is provided automatically and is used for GHCR + release upload.
 
 on:
@@ -145,50 +145,7 @@ jobs:
           cache-to: type=gha,mode=max
 
   # ──────────────────────────────────────────────────────────────────────
-  # 3. npm packages (requires NPM_TOKEN secret)
-  # ──────────────────────────────────────────────────────────────────────
-  npm:
-    name: npm — @geomqtt/{core,leaflet,maplibre}
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write # for provenance
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          registry-url: 'https://registry.npmjs.org'
-
-      - name: Bump workspace versions from tag
-        working-directory: clients
-        run: |
-          set -euo pipefail
-          VERSION="${GITHUB_REF_NAME:-${{ github.event.inputs.tag }}}"
-          VERSION="${VERSION#v}"
-          for pkg in geomqtt-core geomqtt-leaflet geomqtt-maplibre; do
-            (cd "$pkg" && npm version --no-git-tag-version --allow-same-version "$VERSION")
-          done
-
-      - name: Install and build
-        working-directory: clients
-        run: |
-          npm install
-          npm run build
-
-      - name: Publish (in dependency order)
-        working-directory: clients
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          set -euo pipefail
-          for pkg in geomqtt-core geomqtt-leaflet geomqtt-maplibre; do
-            (cd "$pkg" && npm publish --access public --provenance)
-          done
-
-  # ──────────────────────────────────────────────────────────────────────
-  # 4. Unity UPM branch + tag
+  # 3. Unity UPM branch + tag
   # ──────────────────────────────────────────────────────────────────────
   unity-upm:
     name: unity — upm branch + tag
@@ -227,7 +184,7 @@ jobs:
           git push origin "upm/$VERSION_TAG"
 
   # ──────────────────────────────────────────────────────────────────────
-  # 5. GitHub Release with all binary assets attached
+  # 4. GitHub Release with all binary assets attached
   # ──────────────────────────────────────────────────────────────────────
   github-release:
     name: github release
