@@ -126,3 +126,51 @@ fn redis_channel_to_mqtt_topic(channel: &str) -> Option<String> {
             .map(|rest| format!("objects/{rest}"))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn envelope_roundtrip() {
+        let bytes = build_envelope("node-a", b"{\"op\":\"add\"}");
+        let (src, body) = split_envelope(&bytes).unwrap();
+        assert_eq!(src, "node-a");
+        assert_eq!(body, b"{\"op\":\"add\"}");
+    }
+
+    #[test]
+    fn envelope_missing_separator() {
+        assert!(split_envelope(b"no-pipe-here").is_none());
+    }
+
+    #[test]
+    fn envelope_handles_payload_with_pipes() {
+        // Separator is the FIRST '|', so payloads with embedded '|' survive.
+        let bytes = build_envelope("n", b"{\"k\":\"a|b|c\"}");
+        let (src, body) = split_envelope(&bytes).unwrap();
+        assert_eq!(src, "n");
+        assert_eq!(body, b"{\"k\":\"a|b|c\"}");
+    }
+
+    #[test]
+    fn channel_to_topic_tile() {
+        assert_eq!(
+            redis_channel_to_mqtt_topic("gmq:tile:vehicles:10:544:370").as_deref(),
+            Some("geo/vehicles/10/544/370")
+        );
+    }
+
+    #[test]
+    fn channel_to_topic_object() {
+        assert_eq!(
+            redis_channel_to_mqtt_topic("gmq:obj:veh-42").as_deref(),
+            Some("objects/veh-42")
+        );
+    }
+
+    #[test]
+    fn channel_to_topic_unknown_returns_none() {
+        assert!(redis_channel_to_mqtt_topic("some:other").is_none());
+    }
+}

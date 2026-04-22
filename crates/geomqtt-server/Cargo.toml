@@ -24,3 +24,7 @@ fred = { version = "10", features = ["i-geo", "subscriber-client"] }
 redis-protocol = { version = "6", features = ["bytes"] }
 mqttbytes = "0.6"
 parking_lot = "0.12"
+
+[dev-dependencies]
+ureq = { version = "2", features = ["json"] }
+rumqttc = "0.24"

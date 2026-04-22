@@ -156,3 +156,66 @@ pub fn redis_tile_channel(set: &str, z: u8, x: u32, y: u32) -> String {
 pub fn redis_object_channel(obid: &str) -> String {
     format!("gmq:obj:{obid}")
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    fn parse(bytes: &[u8]) -> Value {
+        serde_json::from_slice(bytes).unwrap()
+    }
+
+    #[test]
+    fn tile_payload_shapes() {
+        let p = TilePayload::snapshot("x".into(), 1.0, 2.0, Map::new());
+        let v = parse(&p.to_bytes());
+        assert_eq!(v["op"], "snapshot");
+        assert_eq!(v["id"], "x");
+        assert_eq!(v["lat"], json!(1.0));
+        assert_eq!(v["lng"], json!(2.0));
+        assert!(v.get("attrs").is_none(), "empty attrs must be skipped");
+
+        let p = TilePayload::move_("x".into(), 1.0, 2.0);
+        let v = parse(&p.to_bytes());
+        assert_eq!(v["op"], "move");
+        assert!(v.get("attrs").is_none());
+
+        let p = TilePayload::remove("x".into());
+        let v = parse(&p.to_bytes());
+        assert_eq!(v["op"], "remove");
+        assert_eq!(v["id"], "x");
+        assert!(v.get("lat").is_none());
+    }
+
+    #[test]
+    fn tile_payload_includes_attrs_when_present() {
+        let mut attrs = Map::new();
+        attrs.insert("icon".into(), json!("truck"));
+        let p = TilePayload::add("x".into(), 1.0, 2.0, attrs);
+        let v = parse(&p.to_bytes());
+        assert_eq!(v["attrs"]["icon"], "truck");
+    }
+
+    #[test]
+    fn object_payload_shapes() {
+        let p = ObjectPayload::delete("x".into());
+        let v = parse(&p.to_bytes());
+        assert_eq!(v["op"], "delete");
+        assert_eq!(v["id"], "x");
+    }
+
+    #[test]
+    fn topic_helpers() {
+        assert_eq!(
+            tile_topic("vehicles", 10, 544, 370),
+            "geo/vehicles/10/544/370"
+        );
+        assert_eq!(object_topic("veh-42"), "objects/veh-42");
+        assert_eq!(
+            redis_tile_channel("vehicles", 10, 544, 370),
+            "gmq:tile:vehicles:10:544:370"
+        );
+        assert_eq!(redis_object_channel("veh-42"), "gmq:obj:veh-42");
+    }
+}

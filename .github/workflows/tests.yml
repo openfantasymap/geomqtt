@@ -1,16 +1,14 @@
-name: ci
-
-# Static analysis only — fast feedback on every push/PR. The real test suite
-# lives in tests.yml.
+name: tests
 
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: tests-${{ github.ref }}
   cancel-in-progress: true
 
 env:
@@ -19,19 +17,29 @@ env:
 
 jobs:
   rust:
-    name: rust — fmt + clippy
+    name: rust — unit + integration
     runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+    env:
+      GEOMQTT_TEST_REDIS_URL: redis://127.0.0.1:6379
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
-      - run: cargo fmt --all -- --check
-      - run: cargo clippy --all-targets -- -D warnings
+      - name: cargo test
+        run: cargo test --all-targets
 
   typescript:
-    name: typescript — build + typecheck
+    name: typescript — vitest
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -44,5 +52,7 @@ jobs:
           cache: 'npm'
           cache-dependency-path: clients/package-lock.json
       - run: npm ci || npm install
-      - run: npm run build
-      - run: npm run typecheck
+      - name: build core (needed by adapter typechecks)
+        run: npm run build -w @geomqtt/core
+      - name: vitest
+        run: npm test

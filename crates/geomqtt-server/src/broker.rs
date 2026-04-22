@@ -115,3 +115,81 @@ pub fn encode_publish(topic: &str, payload: &[u8]) -> Bytes {
     publish.write(&mut buf).expect("Publish::write");
     buf.freeze()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tokio::sync::mpsc::unbounded_channel;
+
+    fn drain<T>(rx: &mut tokio::sync::mpsc::UnboundedReceiver<T>) -> Vec<T> {
+        let mut out = Vec::new();
+        while let Ok(v) = rx.try_recv() {
+            out.push(v);
+        }
+        out
+    }
+
+    #[test]
+    fn publish_routes_by_filter() {
+        let broker = Broker::new();
+        let (tx_a, mut rx_a) = unbounded_channel();
+        let (tx_b, mut rx_b) = unbounded_channel();
+        let a = broker.register(tx_a);
+        let b = broker.register(tx_b);
+        broker.subscribe(a, "geo/vehicles/10/+/+".into());
+        broker.subscribe(b, "objects/veh-42".into());
+
+        let delivered = broker.publish_local("geo/vehicles/10/544/370", Bytes::from_static(b"x"));
+        assert_eq!(delivered, 1);
+        assert_eq!(drain(&mut rx_a).len(), 1);
+        assert_eq!(drain(&mut rx_b).len(), 0);
+
+        let delivered = broker.publish_local("objects/veh-42", Bytes::from_static(b"y"));
+        assert_eq!(delivered, 1);
+        assert_eq!(drain(&mut rx_b).len(), 1);
+        assert_eq!(drain(&mut rx_a).len(), 0);
+    }
+
+    #[test]
+    fn unsubscribe_and_deregister() {
+        let broker = Broker::new();
+        let (tx, mut rx) = unbounded_channel();
+        let id = broker.register(tx);
+        broker.subscribe(id, "geo/a/#".into());
+
+        assert_eq!(
+            broker.publish_local("geo/a/b/c", Bytes::from_static(b"1")),
+            1
+        );
+        broker.unsubscribe(id, "geo/a/#");
+        assert_eq!(
+            broker.publish_local("geo/a/b/c", Bytes::from_static(b"2")),
+            0
+        );
+
+        assert_eq!(drain(&mut rx).len(), 1);
+        broker.deregister(id);
+        assert_eq!(
+            broker.publish_local("geo/a/b/c", Bytes::from_static(b"3")),
+            0
+        );
+    }
+
+    #[test]
+    fn has_local_subscriber_for_wildcards() {
+        let broker = Broker::new();
+        let (tx, _rx) = unbounded_channel();
+        let id = broker.register(tx);
+        broker.subscribe(id, "geo/+/10/+/+".into());
+        assert!(broker.has_local_subscriber_for("geo/vehicles/10/544/370"));
+        assert!(!broker.has_local_subscriber_for("geo/vehicles/11/544/370"));
+    }
+
+    #[test]
+    fn encode_publish_shape() {
+        let bytes = encode_publish("a/b", b"hello");
+        // Fixed header for PUBLISH QoS 0: 0x30, then remaining length.
+        assert_eq!(bytes[0], 0x30);
+        assert!(bytes.len() > 5 + 2 + 3); // header + topic-len prefix + topic + payload
+    }
+}

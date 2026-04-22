@@ -7,6 +7,7 @@ into a live, tile-keyed topic tree — so a web or game client can follow a
 moving viewport by subscribing to the tiles it can see.**
 
 [![ci](https://github.com/openfantasymap/geomqtt/actions/workflows/ci.yml/badge.svg)](https://github.com/openfantasymap/geomqtt/actions/workflows/ci.yml)
+[![tests](https://github.com/openfantasymap/geomqtt/actions/workflows/tests.yml/badge.svg)](https://github.com/openfantasymap/geomqtt/actions/workflows/tests.yml)
 [![release](https://github.com/openfantasymap/geomqtt/actions/workflows/release.yml/badge.svg)](https://github.com/openfantasymap/geomqtt/actions/workflows/release.yml)
 [![ghcr](https://img.shields.io/badge/ghcr.io-openfantasymap%2Fgeomqtt-2b3137?logo=docker)](https://github.com/openfantasymap/geomqtt/pkgs/container/geomqtt)
 [![npm core](https://img.shields.io/npm/v/%40geomqtt%2Fcore?label=%40geomqtt%2Fcore&logo=npm)](https://www.npmjs.com/package/@geomqtt/core)
@@ -158,7 +159,8 @@ npm run build
 │   ├── geomqtt-maplibre/       # @geomqtt/maplibre
 │   └── geomqtt-unity/          # com.geomqtt.unity (UPM)
 ├── .github/workflows/
-│   ├── ci.yml                  # Rust fmt/clippy/test + TS build/typecheck
+│   ├── ci.yml                  # Rust fmt + clippy, TS build + typecheck
+│   ├── tests.yml               # Rust unit + integration (Redis service), TS vitest
 │   └── release.yml             # binaries + Docker + npm + UPM branch
 ├── Dockerfile
 ├── docker-compose.yml
