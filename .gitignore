@@ -1,0 +1,14 @@
+/target
+
+# Node / TS
+node_modules/
+clients/*/dist/
+*.tsbuildinfo
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store

@@ -1,0 +1,30 @@
+{
+  "name": "@geomqtt/maplibre",
+  "version": "0.1.0",
+  "description": "MapLibre / Mapbox GL layer driven by a geomqtt server — keeps a GeoJSON source fed from tile subscriptions for the current viewport.",
+  "license": "MIT OR Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "peerDependencies": {
+    "maplibre-gl": "^4.0.0 || ^5.0.0"
+  },
+  "dependencies": {
+    "@geomqtt/core": "*"
+  },
+  "devDependencies": {
+    "maplibre-gl": "^4.7.1"
+  }
+}

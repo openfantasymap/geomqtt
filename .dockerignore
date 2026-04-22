@@ -1,0 +1,7 @@
+target/
+.git/
+clients/
+node_modules/
+*.md
+.vscode/
+.idea/

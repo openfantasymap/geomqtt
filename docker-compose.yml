@@ -1,0 +1,26 @@
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+
+  geomqtt:
+    build: .
+    depends_on:
+      - redis
+    environment:
+      GEOMQTT_REDIS_URL: redis://redis:6379
+      GEOMQTT_ENRICH_ATTRS: icon,color,type,status
+      GEOMQTT_ENRICH_ZOOMS: "6-12"
+      GEOMQTT_TILE_SIZE: "256"
+      RUST_LOG: info,geomqtt_server=debug
+    ports:
+      - "6380:6380"   # RESP (Redis-compatible proxy)
+      - "1883:1883"   # MQTT over TCP
+      - "8083:8083"   # MQTT over WebSocket (browser clients)
+      - "8080:8080"   # HTTP (GeoJSON + /healthz)
+
+volumes:
+  redis-data:

@@ -1,0 +1,19 @@
+{
+  "name": "geomqtt-clients",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Client packages for geomqtt (Leaflet, MapLibre, Unity). See also the Unity UPM package under geomqtt-unity/.",
+  "workspaces": [
+    "geomqtt-core",
+    "geomqtt-leaflet",
+    "geomqtt-maplibre"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "clean": "rm -rf */dist */tsconfig.tsbuildinfo"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0"
+  }
+}

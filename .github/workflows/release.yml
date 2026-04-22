@@ -1,0 +1,255 @@
+name: release
+
+# Triggered by tags matching `v*` (e.g. v0.1.0, v1.2.3-rc.1).
+#
+# Produces:
+#   * Cross-platform server binaries attached to the GitHub Release
+#     (linux-x86_64, linux-aarch64, macos-x86_64, macos-aarch64, windows-x86_64)
+#   * Multi-arch Docker image on GHCR: ghcr.io/<owner>/geomqtt:<version>
+#   * npm packages @geomqtt/core, @geomqtt/leaflet, @geomqtt/maplibre (with provenance)
+#   * A dedicated `upm` branch + `upm/<tag>` tag so Unity users can install via
+#     https://github.com/<owner>/<repo>.git#upm/v0.1.0
+#
+# Secrets required:
+#   NPM_TOKEN — npm automation token (only if publishing to npmjs)
+# GITHUB_TOKEN is provided automatically and is used for GHCR + release upload.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to simulate (e.g. v0.1.0)'
+        required: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # ──────────────────────────────────────────────────────────────────────
+  # 1. Cross-platform server binaries
+  # ──────────────────────────────────────────────────────────────────────
+  binaries:
+    name: binary — ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            archive: tar.gz
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            archive: tar.gz
+            cross_deps: gcc-aarch64-linux-gnu
+            linker: aarch64-linux-gnu-gcc
+          - os: macos-13
+            target: x86_64-apple-darwin
+            archive: tar.gz
+          - os: macos-14
+            target: aarch64-apple-darwin
+            archive: tar.gz
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            archive: zip
+            ext: .exe
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      - name: Install Linux cross deps
+        if: matrix.cross_deps
+        run: sudo apt-get update && sudo apt-get install -y ${{ matrix.cross_deps }}
+
+      - name: Build
+        env:
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: ${{ matrix.linker }}
+        run: cargo build --release --bin geomqtt-server --target ${{ matrix.target }}
+
+      - name: Package
+        id: pkg
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME:-${{ github.event.inputs.tag }}}"
+          VERSION="${VERSION#v}"
+          NAME="geomqtt-server-${VERSION}-${{ matrix.target }}"
+          mkdir -p "dist/$NAME"
+          cp "target/${{ matrix.target }}/release/geomqtt-server${{ matrix.ext }}" "dist/$NAME/"
+          cp README.md PROTOCOL.md "dist/$NAME/"
+          cd dist
+          if [[ "${{ matrix.archive }}" == "zip" ]]; then
+            7z a "$NAME.zip" "$NAME"
+            echo "asset=dist/$NAME.zip" >> "$GITHUB_OUTPUT"
+          else
+            tar czf "$NAME.tar.gz" "$NAME"
+            echo "asset=dist/$NAME.tar.gz" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: binary-${{ matrix.target }}
+          path: ${{ steps.pkg.outputs.asset }}
+          if-no-files-found: error
+          retention-days: 7
+
+  # ──────────────────────────────────────────────────────────────────────
+  # 2. Multi-arch Docker image to GHCR
+  # ──────────────────────────────────────────────────────────────────────
+  docker:
+    name: docker — ghcr multi-arch
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/geomqtt
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ──────────────────────────────────────────────────────────────────────
+  # 3. npm packages (requires NPM_TOKEN secret)
+  # ──────────────────────────────────────────────────────────────────────
+  npm:
+    name: npm — @geomqtt/{core,leaflet,maplibre}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # for provenance
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Bump workspace versions from tag
+        working-directory: clients
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME:-${{ github.event.inputs.tag }}}"
+          VERSION="${VERSION#v}"
+          for pkg in geomqtt-core geomqtt-leaflet geomqtt-maplibre; do
+            (cd "$pkg" && npm version --no-git-tag-version --allow-same-version "$VERSION")
+          done
+
+      - name: Install and build
+        working-directory: clients
+        run: |
+          npm install
+          npm run build
+
+      - name: Publish (in dependency order)
+        working-directory: clients
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+          for pkg in geomqtt-core geomqtt-leaflet geomqtt-maplibre; do
+            (cd "$pkg" && npm publish --access public --provenance)
+          done
+
+  # ──────────────────────────────────────────────────────────────────────
+  # 4. Unity UPM branch + tag
+  # ──────────────────────────────────────────────────────────────────────
+  unity-upm:
+    name: unity — upm branch + tag
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Split clients/geomqtt-unity to upm branch
+        run: |
+          set -euo pipefail
+          VERSION_TAG="${GITHUB_REF_NAME:-${{ github.event.inputs.tag }}}"
+          VERSION="${VERSION_TAG#v}"
+
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+
+          # Pin the Unity package's version to the release tag before splitting.
+          python3 - <<PY
+          import json
+          p = json.load(open('clients/geomqtt-unity/package.json'))
+          p['version'] = '$VERSION'
+          json.dump(p, open('clients/geomqtt-unity/package.json', 'w'), indent=2)
+          PY
+          git add clients/geomqtt-unity/package.json
+          git commit -m "upm: pin version to $VERSION" --allow-empty
+
+          # subtree split captures the upm/ subdirectory as a standalone branch.
+          git subtree split --prefix=clients/geomqtt-unity -b upm-split
+          git push origin upm-split:upm --force
+          git tag "upm/$VERSION_TAG" upm-split
+          git push origin "upm/$VERSION_TAG"
+
+  # ──────────────────────────────────────────────────────────────────────
+  # 5. GitHub Release with all binary assets attached
+  # ──────────────────────────────────────────────────────────────────────
+  github-release:
+    name: github release
+    runs-on: ubuntu-latest
+    needs: [binaries]
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: binary-*
+          path: dist
+          merge-multiple: true
+
+      - name: List artifacts
+        run: ls -la dist
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
