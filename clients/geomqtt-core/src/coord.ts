@@ -37,6 +37,13 @@ export function bboxForTile(
 /**
  * All tiles at zoom `z` that intersect the bbox. Handles antimeridian by not
  * wrapping — callers can split a crossed viewport before calling.
+ *
+ * A bbox edge that sits *exactly* on a tile boundary is treated as belonging
+ * to the inside of the bbox, not the neighboring tile — otherwise floating
+ * point ambiguity at the boundary would over-include a row/column on each
+ * side. The corners are nudged inward by a fraction of a tile span, which is
+ * far smaller than any practical viewport edge yet enough to escape the
+ * floor-rounding edge case.
  */
 export function tilesCoveringBbox(
   z: number,
@@ -45,8 +52,10 @@ export function tilesCoveringBbox(
   e: number,
   n: number,
 ): TileCoord[] {
-  const tl = tileForCoord(z, n, w);
-  const br = tileForCoord(z, s, e);
+  const tileSpan = 360 / 2 ** z;
+  const eps = tileSpan * 1e-9;
+  const tl = tileForCoord(z, n - eps, w + eps);
+  const br = tileForCoord(z, s + eps, e - eps);
   const xMin = Math.min(tl.x, br.x);
   const xMax = Math.max(tl.x, br.x);
   const yMin = Math.min(tl.y, br.y);

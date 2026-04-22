@@ -60,6 +60,14 @@ describe("tilesCoveringBbox", () => {
     expect(tiles).toContainEqual({ z: 10, x: 544, y: 370 });
     expect(tiles).toContainEqual({ z: 10, x: 545, y: 371 });
   });
+
+  test("bbox at exact tile boundaries doesn't over-include neighbours", () => {
+    // Regression: floating-point ambiguity at boundaries used to make a
+    // single-tile bbox resolve to a 3x3 (or 2x2) block of neighbours.
+    const a = bboxForTile(10, 544, 370);
+    const tiles = tilesCoveringBbox(10, a.w, a.s, a.e, a.n);
+    expect(tiles).toEqual([{ z: 10, x: 544, y: 370 }]);
+  });
 });
 
 describe("closestPublishedZoom", () => {
