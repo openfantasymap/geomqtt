@@ -1,5 +1,5 @@
 import L from "leaflet";
-import { GeomqttClient, type Feature, type GeomqttEvent } from "@geomqtt/core";
+import { GeomqttClient, type Feature, type GeomqttEvent } from "@openfantasymap/geomqtt-core";
 
 export interface GeomqttLeafletOptions {
   /** MQTT-over-WebSocket URL of the geomqtt server, e.g. `ws://localhost:8083`. */

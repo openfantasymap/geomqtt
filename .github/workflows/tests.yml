@@ -53,6 +53,6 @@ jobs:
           cache-dependency-path: clients/package-lock.json
       - run: npm ci || npm install
       - name: build core (needed by adapter typechecks)
-        run: npm run build -w @geomqtt/core
+        run: npm run build -w @openfantasymap/geomqtt-core
       - name: vitest
         run: npm test

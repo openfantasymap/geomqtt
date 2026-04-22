@@ -11,7 +11,7 @@ moving viewport by subscribing to the tiles it can see.**
 [![npm](https://github.com/openfantasymap/geomqtt/actions/workflows/npm.yml/badge.svg)](https://github.com/openfantasymap/geomqtt/actions/workflows/npm.yml)
 [![release](https://github.com/openfantasymap/geomqtt/actions/workflows/release.yml/badge.svg)](https://github.com/openfantasymap/geomqtt/actions/workflows/release.yml)
 [![ghcr](https://img.shields.io/badge/ghcr.io-openfantasymap%2Fgeomqtt-2b3137?logo=docker)](https://github.com/openfantasymap/geomqtt/pkgs/container/geomqtt)
-[![npm core](https://img.shields.io/npm/v/%40geomqtt%2Fcore?label=%40geomqtt%2Fcore&logo=npm)](https://www.npmjs.com/package/@geomqtt/core)
+[![gh packages](https://img.shields.io/badge/gh%20packages-%40openfantasymap%2Fgeomqtt--*-2b3137?logo=github)](https://github.com/openfantasymap/geomqtt/packages)
 [![license](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue)](#license)
 
 [Quick start](#-quick-start) · [Architecture](#-architecture) · [Clients](#-clients) · [Protocol](./PROTOCOL.md) · [Roadmap](#-roadmap)
@@ -77,10 +77,21 @@ Pick the channel that matches how you're going to run or talk to geomqtt:
 |---------------------------|------------------------------------------------------------------------------|
 | **Docker (multi-arch)**   | `docker pull ghcr.io/openfantasymap/geomqtt:latest`                          |
 | **Binaries**              | [GitHub Releases](https://github.com/openfantasymap/geomqtt/releases) — Linux / macOS / Windows, x86_64 + aarch64 |
-| **npm — core library**    | `npm install @geomqtt/core` *(published by [npm.yml](.github/workflows/npm.yml) on tag push or manual dispatch — needs `NPM_TOKEN` repo secret)* |
-| **npm — Leaflet adapter** | `npm install @geomqtt/leaflet`                                               |
-| **npm — MapLibre adapter**| `npm install @geomqtt/maplibre`                                              |
+| **npm — core library**    | `npm install @openfantasymap/geomqtt-core` *(published to GitHub Packages by [npm.yml](.github/workflows/npm.yml) on tag push or manual dispatch — see install note below)* |
+| **npm — Leaflet adapter** | `npm install @openfantasymap/geomqtt-leaflet`                                |
+| **npm — MapLibre adapter**| `npm install @openfantasymap/geomqtt-maplibre`                               |
 | **Unity (UPM)**           | Add `https://github.com/openfantasymap/geomqtt.git#upm/v0.1.0` to `manifest.json` |
+
+> **GitHub Packages install note.** The npm packages live on GitHub Packages,
+> which requires authentication even for public packages. Add a `.npmrc` at
+> your project root (or `~/.npmrc`):
+>
+> ```ini
+> @openfantasymap:registry=https://npm.pkg.github.com
+> //npm.pkg.github.com/:_authToken=YOUR_GITHUB_PAT
+> ```
+>
+> Any GitHub personal access token with the `read:packages` scope works.
 
 ## ⚙️ Configuration
 
@@ -111,15 +122,15 @@ different runtimes:
 
 <table>
   <tr>
-    <td><b><a href="./clients/geomqtt-core">@geomqtt/core</a></b></td>
+    <td><b><a href="./clients/geomqtt-core">@openfantasymap/geomqtt-core</a></b></td>
     <td>TypeScript. MQTT transport, tile math, viewport-diff subscribe loop, state map. Runs in Node and the browser.</td>
   </tr>
   <tr>
-    <td><b><a href="./clients/geomqtt-leaflet">@geomqtt/leaflet</a></b></td>
+    <td><b><a href="./clients/geomqtt-leaflet">@openfantasymap/geomqtt-leaflet</a></b></td>
     <td><code>L.LayerGroup</code> adapter. Wires <code>moveend</code>/<code>zoomend</code> to the core client; default <code>L.circleMarker</code> rendering with a <code>markerFor</code> hook.</td>
   </tr>
   <tr>
-    <td><b><a href="./clients/geomqtt-maplibre">@geomqtt/maplibre</a></b></td>
+    <td><b><a href="./clients/geomqtt-maplibre">@openfantasymap/geomqtt-maplibre</a></b></td>
     <td>MapLibre / Mapbox GL adapter. Keeps a GeoJSON source fed from the current state; debounced via <code>updateThrottleMs</code>.</td>
   </tr>
   <tr>
@@ -155,14 +166,14 @@ npm run build
 │           ├── payload.rs      # JSON payloads (mirrored in client packages)
 │           └── redis.rs        # fred client + cross-node pub/sub bridge
 ├── clients/
-│   ├── geomqtt-core/           # @geomqtt/core — TypeScript
-│   ├── geomqtt-leaflet/        # @geomqtt/leaflet
-│   ├── geomqtt-maplibre/       # @geomqtt/maplibre
+│   ├── geomqtt-core/           # @openfantasymap/geomqtt-core — TypeScript
+│   ├── geomqtt-leaflet/        # @openfantasymap/geomqtt-leaflet
+│   ├── geomqtt-maplibre/       # @openfantasymap/geomqtt-maplibre
 │   └── geomqtt-unity/          # com.geomqtt.unity (UPM)
 ├── .github/workflows/
 │   ├── ci.yml                  # Rust fmt + clippy, TS build + typecheck
 │   ├── tests.yml               # Rust unit + integration (Redis service), TS vitest
-│   ├── npm.yml                 # Publishes @geomqtt/* — auto on tag, manual via dispatch
+│   ├── npm.yml                 # Publishes @openfantasymap/geomqtt-* to GH Packages
 │   └── release.yml             # Cross-platform binaries + Docker (GHCR) + UPM branch
 ├── Dockerfile
 ├── docker-compose.yml
@@ -181,7 +192,7 @@ npm run build
 - [x] Per-subscriber snapshot burst on SUBSCRIBE
 - [x] Cross-node Redis pub/sub with node-id envelope
 - [x] HTTP GeoJSON endpoints + `/config`
-- [x] `@geomqtt/core`, `@geomqtt/leaflet`, `@geomqtt/maplibre` TS packages
+- [x] `@openfantasymap/geomqtt-{core,leaflet,maplibre}` TS packages on GH Packages
 - [x] Unity UPM package with `GeomqttClient` + `GeomqttWorld3D`
 - [x] CI + release automation (binaries, Docker, npm, UPM)
 - [ ] Tile-side `attr` fanout (attribute-only updates also reach tile topics)

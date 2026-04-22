@@ -1,9 +1,18 @@
 {
-  "name": "@geomqtt/core",
+  "name": "@openfantasymap/geomqtt-core",
   "version": "0.1.0",
   "description": "Transport, tile math, and subscription logic for geomqtt. Used by the Leaflet and MapLibre adapters; no DOM dependency.",
   "license": "MIT OR Apache-2.0",
   "type": "module",
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/openfantasymap/geomqtt.git",
+    "directory": "clients/geomqtt-core"
+  },
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",

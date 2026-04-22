@@ -9,8 +9,8 @@ name: release
 #   * A dedicated `upm` branch + `upm/<tag>` tag so Unity users can install via
 #     https://github.com/<owner>/<repo>.git#upm/v0.1.0
 #
-# npm publishing of @geomqtt/* lives in npm.yml so it can also be triggered
-# manually for prereleases / republishes without retagging.
+# npm publishing of @openfantasymap/geomqtt-* lives in npm.yml so it can
+# also be triggered manually for prereleases / republishes without retagging.
 #
 # GITHUB_TOKEN is provided automatically and is used for GHCR + release upload.
 

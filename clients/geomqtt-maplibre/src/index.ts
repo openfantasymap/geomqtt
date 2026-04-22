@@ -3,7 +3,7 @@ import type {
   LayerSpecification,
   Map as MapLibreMap,
 } from "maplibre-gl";
-import { GeomqttClient, type Feature, type GeomqttEvent } from "@geomqtt/core";
+import { GeomqttClient, type Feature, type GeomqttEvent } from "@openfantasymap/geomqtt-core";
 
 export interface GeomqttMaplibreOptions {
   /** The MapLibre / Mapbox GL map instance. */

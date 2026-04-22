@@ -143,7 +143,7 @@ loose on purpose during scaffold.
 ## Clients
 
 Four packages under `clients/`. TS workspace uses npm workspaces — build
-`@geomqtt/core` before the adapters since they resolve it via the `dist/`
+`@openfantasymap/geomqtt-core` before the adapters since they resolve it via the `dist/`
 emit:
 
 ```
@@ -154,14 +154,15 @@ Source layout:
 
 ```
 clients/
-  geomqtt-core/      @geomqtt/core — transport (mqtt.js), tile math, viewport
-                     diff, feature state map. No DOM deps. ES module.
-  geomqtt-leaflet/   @geomqtt/leaflet — GeomqttLayer (extends L.LayerGroup).
-                     Wires moveend/zoomend → setViewport. markerFor hook for
-                     custom rendering.
-  geomqtt-maplibre/  @geomqtt/maplibre — GeomqttSource. Keeps a GeoJSON source
-                     + default circle layer fed from client.snapshot().
-                     Debounced via updateThrottleMs (default 33ms).
+  geomqtt-core/      @openfantasymap/geomqtt-core — transport (mqtt.js),
+                     tile math, viewport diff, feature state map. No DOM
+                     deps. ES module.
+  geomqtt-leaflet/   @openfantasymap/geomqtt-leaflet — GeomqttLayer (extends
+                     L.LayerGroup). Wires moveend/zoomend → setViewport.
+                     markerFor hook for custom rendering.
+  geomqtt-maplibre/  @openfantasymap/geomqtt-maplibre — GeomqttSource. Keeps
+                     a GeoJSON source + default circle layer fed from
+                     client.snapshot(). Debounced via updateThrottleMs (33ms).
   geomqtt-unity/     com.geomqtt.unity — UPM package. GeomqttClient is pure C#
                      (MQTTnet 4.x + Newtonsoft.Json); events are queued on a
                      worker thread and drained by GeomqttWorld3D.Update() via
