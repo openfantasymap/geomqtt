@@ -168,11 +168,18 @@ clients/
                      worker thread and drained by GeomqttWorld3D.Update() via
                      client.PumpEvents(). Default MonoBehaviour spawns sphere
                      markers in 3D world space via Geodesy.ToEnu(origin, …).
+  geomqtt-unreal/    Unreal Engine plugin (UE 5.3+). Hand-rolled MQTT v3.1.1
+                     codec (Private/MqttCodec.{h,cpp}, ~150 LoC) running over
+                     UE's stock WebSockets module — no third-party MQTT
+                     dependency. UGeomqttClient owns the WS + state, fires
+                     OnFeatureUpsert/Remove on the game thread.
+                     AGeomqttMarkerSpawner is the drag-and-drop equivalent of
+                     Unity's GeomqttWorld3D. UGeomqttSubsystem (UWorldSubsystem)
+                     gives Blueprints a singleton-style accessor.
 ```
 
-Unity shape: 3D world-anchored is the default; 2D map overlay inside Unity
-works by instantiating `GeomqttClient` directly and rendering with sprites /
-UI Toolkit without `GeomqttWorld3D`.
+Unity / Unreal shape: 3D world-anchored is the default; 2D map / HUD overlay
+works by instantiating the client directly and rendering yourself.
 
 ## Open questions (for the user, not to guess at)
 

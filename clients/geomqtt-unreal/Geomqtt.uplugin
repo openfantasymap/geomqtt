@@ -1,0 +1,28 @@
+{
+  "FileVersion": 3,
+  "Version": 1,
+  "VersionName": "0.1.0",
+  "FriendlyName": "geomqtt",
+  "Description": "Unreal Engine client for a geomqtt server. Subscribes to tile-keyed MQTT topics covering an area of interest and exposes per-object add / move / remove events to Blueprint and C++ gameplay code.",
+  "Category": "Networking",
+  "CreatedBy": "openfantasymap",
+  "CreatedByURL": "https://github.com/openfantasymap/geomqtt",
+  "DocsURL": "https://github.com/openfantasymap/geomqtt/blob/main/PROTOCOL.md",
+  "MarketplaceURL": "",
+  "SupportURL": "https://github.com/openfantasymap/geomqtt/issues",
+  "EngineVersion": "5.3.0",
+  "EnabledByDefault": true,
+  "CanContainContent": false,
+  "IsBetaVersion": true,
+  "Installed": false,
+  "Modules": [
+    {
+      "Name": "Geomqtt",
+      "Type": "Runtime",
+      "LoadingPhase": "Default"
+    }
+  ],
+  "Plugins": [
+    { "Name": "WebSockets", "Enabled": true }
+  ]
+}

@@ -81,6 +81,7 @@ Pick the channel that matches how you're going to run or talk to geomqtt:
 | **npm — Leaflet adapter** | `npm install @openfantasymap/geomqtt-leaflet`                                |
 | **npm — MapLibre adapter**| `npm install @openfantasymap/geomqtt-maplibre`                               |
 | **Unity (UPM)**           | Add `https://github.com/openfantasymap/geomqtt.git#upm/v0.1.0` to `manifest.json` |
+| **Unreal (UE 5.3+)**      | Drop [`clients/geomqtt-unreal/`](./clients/geomqtt-unreal) into your project's `Plugins/Geomqtt/` and rebuild |
 
 > **GitHub Packages install note.** The npm packages live on GitHub Packages,
 > which requires authentication even for public packages. Add a `.npmrc` at
@@ -137,6 +138,10 @@ different runtimes:
     <td><b><a href="./clients/geomqtt-unity">com.geomqtt.unity</a></b></td>
     <td>Unity UPM package. Pure-C# <code>GeomqttClient</code> plus a <code>GeomqttWorld3D</code> MonoBehaviour that projects lat/lng → local ENU meters for 3D world-anchored scenes. 2D overlay also supported.</td>
   </tr>
+  <tr>
+    <td><b><a href="./clients/geomqtt-unreal">geomqtt (UE 5.3+)</a></b></td>
+    <td>Unreal Engine plugin. Built-in MQTT v3.1.1 codec over UE's <code>WebSockets</code> module — no third-party MQTT plugin required. <code>UGeomqttClient</code> for protocol logic, <code>AGeomqttMarkerSpawner</code> for drag-and-drop 3D world-anchored scenes, <code>UGeomqttSubsystem</code> for Blueprint access.</td>
+  </tr>
 </table>
 
 Build the TypeScript workspace:
@@ -169,7 +174,8 @@ npm run build
 │   ├── geomqtt-core/           # @openfantasymap/geomqtt-core — TypeScript
 │   ├── geomqtt-leaflet/        # @openfantasymap/geomqtt-leaflet
 │   ├── geomqtt-maplibre/       # @openfantasymap/geomqtt-maplibre
-│   └── geomqtt-unity/          # com.geomqtt.unity (UPM)
+│   ├── geomqtt-unity/          # com.geomqtt.unity (UPM)
+│   └── geomqtt-unreal/         # Unreal Engine plugin (UE 5.3+, built-in MQTT codec over WS)
 ├── .github/workflows/
 │   ├── ci.yml                  # Rust fmt + clippy, TS build + typecheck
 │   ├── tests.yml               # Rust unit + integration (Redis service), TS vitest
@@ -194,6 +200,7 @@ npm run build
 - [x] HTTP GeoJSON endpoints + `/config`
 - [x] `@openfantasymap/geomqtt-{core,leaflet,maplibre}` TS packages on GH Packages
 - [x] Unity UPM package with `GeomqttClient` + `GeomqttWorld3D`
+- [x] Unreal Engine plugin (`UGeomqttClient` + `AGeomqttMarkerSpawner`, built-in MQTT codec)
 - [x] CI + release automation (binaries, Docker, npm, UPM)
 - [ ] Tile-side `attr` fanout (attribute-only updates also reach tile topics)
 - [ ] Lua-scripted atomic GEOADD + old-pos capture
