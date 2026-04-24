@@ -21,6 +21,17 @@ docker compose up --build
 
 ## Run standalone
 
+Pull the published image from GHCR:
+
+```sh
+docker run --rm \
+    -e GEOMQTT_HOST=host.docker.internal \
+    -e GEOMQTT_PORT=6380 \
+    ghcr.io/openfantasymap/geomqtt-iss-demo:latest
+```
+
+Or build it locally:
+
 ```sh
 docker build -t geomqtt-iss-demo examples/iss-demo
 docker run --rm \

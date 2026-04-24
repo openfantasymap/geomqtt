@@ -91,6 +91,7 @@ Pick the channel that matches how you're going to run or talk to geomqtt:
 | Channel                   | Address                                                                      |
 |---------------------------|------------------------------------------------------------------------------|
 | **Docker (multi-arch)**   | `docker pull ghcr.io/openfantasymap/geomqtt:latest`                          |
+| **Docker — ISS demo**     | `docker pull ghcr.io/openfantasymap/geomqtt-iss-demo:latest`                 |
 | **Binaries**              | [GitHub Releases](https://github.com/openfantasymap/geomqtt/releases) — Linux / macOS / Windows, x86_64 + aarch64 |
 | **npm — core library**    | `npm install @openfantasymap/geomqtt-core` *(published to GitHub Packages by [npm.yml](.github/workflows/npm.yml) on tag push or manual dispatch — see install note below)* |
 | **npm — Leaflet adapter** | `npm install @openfantasymap/geomqtt-leaflet`                                |

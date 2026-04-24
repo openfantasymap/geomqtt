@@ -104,14 +104,26 @@ jobs:
           retention-days: 7
 
   # ──────────────────────────────────────────────────────────────────────
-  # 2. Multi-arch Docker image to GHCR
+  # 2. Multi-arch Docker images to GHCR
+  #    - geomqtt           (the server)
+  #    - geomqtt-iss-demo  (the examples/iss-demo sidecar)
   # ──────────────────────────────────────────────────────────────────────
   docker:
-    name: docker — ghcr multi-arch
+    name: docker — ${{ matrix.image }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: geomqtt
+            context: .
+            dockerfile: Dockerfile
+          - image: geomqtt-iss-demo
+            context: examples/iss-demo
+            dockerfile: examples/iss-demo/Dockerfile
     steps:
       - uses: actions/checkout@v4
 
@@ -127,7 +139,7 @@ jobs:
       - id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository_owner }}/geomqtt
+          images: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
@@ -135,14 +147,14 @@ jobs:
 
       - uses: docker/build-push-action@v6
         with:
-          context: .
-          file: Dockerfile
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
 
   # ──────────────────────────────────────────────────────────────────────
   # 3. Unity UPM branch + tag
