@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>geomqtt — ISS demo</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@5/dist/maplibre-gl.css" />
+    <style>
+      html, body, #map { margin: 0; height: 100%; background: #0b1020; }
+      body { color: #e6e6e6; font-family: system-ui, -apple-system, Segoe UI, sans-serif; }
+      #overlay {
+        position: absolute; top: 12px; left: 12px;
+        background: rgba(11, 16, 32, 0.88);
+        backdrop-filter: blur(6px);
+        padding: 14px 16px; border-radius: 10px; z-index: 10;
+        max-width: 360px; font-size: 13px; line-height: 1.45;
+        box-shadow: 0 4px 24px rgba(0,0,0,0.35);
+      }
+      #overlay h1 { font-size: 14px; margin: 0 0 8px 0; font-weight: 600; letter-spacing: 0.3px; }
+      #overlay p { margin: 6px 0; color: #c8ccd8; }
+      #overlay code { background: #1b1f33; padding: 1px 4px; border-radius: 3px; font-size: 12px; }
+      #overlay label { display: block; margin-top: 10px; font-size: 11px; letter-spacing: 0.5px; color: #9aa; text-transform: uppercase; }
+      #overlay input {
+        width: 100%; padding: 7px 9px; margin-top: 3px;
+        border-radius: 5px; border: 1px solid #333;
+        background: #151a2c; color: inherit; box-sizing: border-box;
+        font-family: inherit; font-size: 13px;
+      }
+      #overlay .row { display: flex; gap: 8px; margin-top: 10px; align-items: center; }
+      #overlay button {
+        padding: 7px 14px; border: 0; border-radius: 5px;
+        background: #ff5722; color: #fff; cursor: pointer; font-weight: 600;
+      }
+      #overlay button:hover { background: #ff6a3d; }
+      #status { margin-top: 10px; font-size: 12px; color: #8a9; min-height: 16px; }
+      #status.error { color: #f77; }
+    </style>
+    <script type="importmap">
+      {
+        "imports": {
+          "maplibre-gl": "https://cdn.jsdelivr.net/npm/maplibre-gl@5/+esm"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <div id="map"></div>
+    <div id="overlay">
+      <h1>geomqtt — ISS demo</h1>
+      <p>
+        Connects to a <a href="https://github.com/openfantasymap/geomqtt">geomqtt</a>
+        server over MQTT-over-WebSocket and renders the <code>iss</code> set
+        fed by <code>examples/iss-demo</code>.
+      </p>
+      <p>
+        GitHub Pages serves this over HTTPS, so the server URL must be
+        <code>wss://</code>. For local dev run <code>npm run dev</code> and
+        use <code>ws://localhost:8083</code>.
+      </p>
+      <label for="url">Server URL</label>
+      <input id="url" type="text" autocomplete="off" spellcheck="false"
+             placeholder="wss://your-host:8083" />
+      <label for="set">Set</label>
+      <input id="set" type="text" autocomplete="off" spellcheck="false" value="iss" />
+      <div class="row">
+        <button id="connect">Connect</button>
+      </div>
+      <div id="status"></div>
+    </div>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

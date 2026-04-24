@@ -69,6 +69,21 @@ curl http://localhost:8080/config
 mosquitto_sub -h localhost -p 1883 -t 'geo/vehicles/10/544/370'
 ```
 
+The compose file also runs [`examples/iss-demo`](examples/iss-demo/), a tiny
+sidecar that polls the open-notify ISS position endpoint every 5 s and feeds
+it into geomqtt — handy for watching live tile traffic without any local
+data:
+
+```sh
+mosquitto_sub -h localhost -p 1883 -t 'geo/iss/#' -v
+curl http://localhost:8080/objects/iss
+```
+
+A matching static web UI lives in [`examples/web-iss`](examples/web-iss/) —
+a MapLibre page that subscribes to the `iss` set and is published to
+GitHub Pages by `.github/workflows/pages.yml`. Point it at your own
+`wss://` geomqtt endpoint via the URL input (or `?url=wss://…`).
+
 ## 📦 Install
 
 Pick the channel that matches how you're going to run or talk to geomqtt:

@@ -1,0 +1,20 @@
+{
+  "name": "geomqtt-web-iss-demo",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Static MapLibre demo that subscribes to a geomqtt server and renders the ISS position fed by examples/iss-demo.",
+  "scripts": {
+    "build": "node build.mjs",
+    "dev": "node build.mjs && npx --yes http-server public -p 4173 -c-1"
+  },
+  "dependencies": {
+    "@openfantasymap/geomqtt-core": "file:../../clients/geomqtt-core",
+    "@openfantasymap/geomqtt-maplibre": "file:../../clients/geomqtt-maplibre"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.0",
+    "maplibre-gl": "^5.0.0",
+    "typescript": "^5.6.0"
+  }
+}

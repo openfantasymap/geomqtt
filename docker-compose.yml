@@ -22,5 +22,17 @@ services:
       - "8083:8083"   # MQTT over WebSocket (browser clients)
       - "8080:8080"   # HTTP (GeoJSON + /healthz)
 
+  iss-demo:
+    build: ./examples/iss-demo
+    depends_on:
+      - geomqtt
+    environment:
+      GEOMQTT_HOST: geomqtt
+      GEOMQTT_PORT: "6380"
+      GEOMQTT_SET: iss
+      GEOMQTT_OBID: iss
+      INTERVAL: "5"
+    restart: unless-stopped
+
 volumes:
   redis-data:
