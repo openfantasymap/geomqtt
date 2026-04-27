@@ -65,6 +65,9 @@ curl http://localhost:8080/tiles/vehicles/10/544/370
 # discover server tile-size + effective zooms
 curl http://localhost:8080/config
 
+# Prometheus-format counters (uptime, sessions, fanout volumes, …)
+curl http://localhost:8080/status
+
 # subscribe to live updates (raw TCP)
 mosquitto_sub -h localhost -p 1883 -t 'geo/vehicles/10/544/370'
 ```
