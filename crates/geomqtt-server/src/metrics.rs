@@ -59,6 +59,27 @@ impl Metrics {
         let _ = writeln!(s, "# TYPE geomqtt_uptime_seconds gauge");
         let _ = writeln!(s, "geomqtt_uptime_seconds {uptime}");
 
+        if let Some(mem) = read_proc_self_status() {
+            let _ = writeln!(
+                s,
+                "# HELP process_resident_memory_bytes Resident memory in bytes (Linux VmRSS)"
+            );
+            let _ = writeln!(s, "# TYPE process_resident_memory_bytes gauge");
+            let _ = writeln!(s, "process_resident_memory_bytes {}", mem.rss);
+            let _ = writeln!(
+                s,
+                "# HELP process_virtual_memory_bytes Virtual memory in bytes (Linux VmSize)"
+            );
+            let _ = writeln!(s, "# TYPE process_virtual_memory_bytes gauge");
+            let _ = writeln!(s, "process_virtual_memory_bytes {}", mem.vsize);
+            let _ = writeln!(
+                s,
+                "# HELP process_resident_memory_max_bytes Peak resident memory in bytes (Linux VmHWM)"
+            );
+            let _ = writeln!(s, "# TYPE process_resident_memory_max_bytes gauge");
+            let _ = writeln!(s, "process_resident_memory_max_bytes {}", mem.hwm);
+        }
+
         let _ = writeln!(
             s,
             "# HELP geomqtt_mqtt_sessions Active MQTT sessions on this node"
@@ -154,4 +175,49 @@ impl Metrics {
 
         s
     }
+}
+
+struct ProcMem {
+    rss: u64,
+    vsize: u64,
+    hwm: u64,
+}
+
+/// Single read of /proc/self/status (Linux only). Tens of microseconds.
+fn read_proc_self_status() -> Option<ProcMem> {
+    #[cfg(target_os = "linux")]
+    {
+        let raw = std::fs::read_to_string("/proc/self/status").ok()?;
+        let mut rss = 0u64;
+        let mut vsize = 0u64;
+        let mut hwm = 0u64;
+        for line in raw.lines() {
+            let parsed = parse_status_kb(line);
+            if let Some((key, bytes)) = parsed {
+                match key {
+                    "VmRSS" => rss = bytes,
+                    "VmSize" => vsize = bytes,
+                    "VmHWM" => hwm = bytes,
+                    _ => {}
+                }
+            }
+        }
+        if rss == 0 && vsize == 0 && hwm == 0 {
+            None
+        } else {
+            Some(ProcMem { rss, vsize, hwm })
+        }
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        None
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn parse_status_kb(line: &str) -> Option<(&str, u64)> {
+    let (key, rest) = line.split_once(':')?;
+    let n = rest.split_whitespace().next()?;
+    let kb: u64 = n.parse().ok()?;
+    Some((key, kb * 1024))
 }
