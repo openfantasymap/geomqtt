@@ -30,6 +30,7 @@ pub struct RespContext {
     pub broker: Arc<Broker>,
     pub redis: RedisHandle,
     pub cfg: Arc<Config>,
+    pub metrics: Arc<crate::metrics::Metrics>,
 }
 
 pub async fn serve(addr: SocketAddr, ctx: RespContext) -> Result<()> {
@@ -72,6 +73,9 @@ async fn handle_command(frame: Resp2Frame, ctx: &RespContext) -> Resp2Frame {
         Some(a) if !a.is_empty() => a,
         _ => return Resp2Frame::Error("ERR empty or malformed command".into()),
     };
+    ctx.metrics
+        .resp_commands
+        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     let cmd = args[0].to_ascii_uppercase();
 
     // Pre-interception: capture old position for GEOADD/ZREM.
@@ -117,6 +121,7 @@ async fn handle_command(frame: Resp2Frame, ctx: &RespContext) -> Resp2Frame {
         broker: ctx.broker.clone(),
         redis: ctx.redis.clone(),
         enrich_zooms: ctx.cfg.enrich_zooms.clone(),
+        metrics: ctx.metrics.clone(),
     };
     match cmd.as_str() {
         "GEOADD" => {
@@ -130,11 +135,15 @@ async fn handle_command(frame: Resp2Frame, ctx: &RespContext) -> Resp2Frame {
                             broker: ctx.broker.clone(),
                             redis: ctx.redis.clone(),
                             cfg: ctx.cfg.clone(),
+                            metrics: ctx.metrics.clone(),
                         },
                         member,
                     )
                     .await
                     .unwrap_or_default();
+                    ctx.metrics
+                        .resp_geo_writes
+                        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                     fanout.on_geo_write(&set, member, old, new, attrs).await;
                 }
             }
@@ -143,6 +152,9 @@ async fn handle_command(frame: Resp2Frame, ctx: &RespContext) -> Resp2Frame {
             if let Some(set) = pre_set {
                 for (i, member) in pre_members.iter().enumerate() {
                     if let Some(Some(pos)) = pre_positions.get(i) {
+                        ctx.metrics
+                            .resp_geo_writes
+                            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                         fanout.on_geo_remove(&set, member, *pos).await;
                     }
                 }

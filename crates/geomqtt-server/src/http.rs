@@ -23,10 +23,15 @@ pub struct HttpState {
 pub async fn serve(addr: SocketAddr, state: HttpState) -> Result<()> {
     let app = Router::new()
         .route("/healthz", get(healthz))
+        .route("/status", get(status_prom))
         .route("/config", get(config_json))
         .route("/tiles/{set}/{z}/{x}/{y}", get(tile_geojson))
         .route("/viewport/{set}", get(viewport_geojson))
         .route("/objects/{obid}", get(object_geojson))
+        .layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            count_request,
+        ))
         .with_state(state);
 
     let listener = tokio::net::TcpListener::bind(addr).await?;
@@ -35,8 +40,33 @@ pub async fn serve(addr: SocketAddr, state: HttpState) -> Result<()> {
     Ok(())
 }
 
+async fn count_request(
+    State(state): State<HttpState>,
+    req: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> axum::response::Response {
+    state
+        .ctx
+        .metrics
+        .http_requests
+        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    next.run(req).await
+}
+
 async fn healthz() -> &'static str {
     "ok"
+}
+
+async fn status_prom(State(state): State<HttpState>) -> impl IntoResponse {
+    let body = state
+        .ctx
+        .metrics
+        .render(&state.ctx.broker, &state.ctx.redis.node_id);
+    (
+        StatusCode::OK,
+        [(header::CONTENT_TYPE, "text/plain; version=0.0.4")],
+        body,
+    )
 }
 
 async fn config_json(State(state): State<HttpState>) -> impl IntoResponse {

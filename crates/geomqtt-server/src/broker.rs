@@ -72,6 +72,15 @@ impl Broker {
         }
     }
 
+    /// `(sessions, subscriptions)`. Used by the /status Prometheus endpoint;
+    /// O(N) over sessions but only called per scrape.
+    pub fn size(&self) -> (usize, usize) {
+        let inner = self.inner.lock();
+        let sessions = inner.sessions.len();
+        let subs: usize = inner.sessions.values().map(|s| s.subs.len()).sum();
+        (sessions, subs)
+    }
+
     /// List of topic filters currently subscribed across all sessions.
     /// Used to decide whether a given tile publish has any local audience.
     #[allow(dead_code)]

@@ -21,6 +21,7 @@ pub struct Fanout {
     pub broker: Arc<Broker>,
     pub redis: RedisHandle,
     pub enrich_zooms: Vec<u8>,
+    pub metrics: Arc<crate::metrics::Metrics>,
 }
 
 impl Fanout {
@@ -28,6 +29,9 @@ impl Fanout {
         let topic = tile_topic(set, z, x, y);
         let body = payload.to_bytes();
         self.broker.publish_local(&topic, body.clone().into());
+        self.metrics
+            .tile_fanouts
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         let channel = redis_tile_channel(set, z, x, y);
         let envelope = build_envelope(&self.redis.node_id, &body);
         if let Err(e) = self
@@ -44,6 +48,9 @@ impl Fanout {
         let topic = format!("objects/{obid}");
         let body = payload.to_bytes();
         self.broker.publish_local(&topic, body.clone().into());
+        self.metrics
+            .object_fanouts
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         let channel = redis_object_channel(obid);
         let envelope = build_envelope(&self.redis.node_id, &body);
         if let Err(e) = self

@@ -37,6 +37,7 @@ pub struct MqttContext {
     pub broker: Arc<Broker>,
     pub redis: RedisHandle,
     pub cfg: Arc<Config>,
+    pub metrics: Arc<crate::metrics::Metrics>,
 }
 
 pub async fn serve(tcp_addr: SocketAddr, ws_addr: SocketAddr, ctx: MqttContext) -> Result<()> {
@@ -50,6 +51,10 @@ pub async fn serve(tcp_addr: SocketAddr, ws_addr: SocketAddr, ctx: MqttContext) 
     let tcp_loop = async move {
         loop {
             let (sock, peer) = tcp.accept().await?;
+            tcp_ctx
+                .metrics
+                .mqtt_connections_tcp
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             let ctx = tcp_ctx.clone();
             tokio::spawn(async move {
                 if let Err(e) = handle_tcp(sock, ctx).await {
@@ -63,6 +68,10 @@ pub async fn serve(tcp_addr: SocketAddr, ws_addr: SocketAddr, ctx: MqttContext) 
     let ws_loop = async move {
         loop {
             let (sock, peer) = ws.accept().await?;
+            ws_ctx
+                .metrics
+                .mqtt_connections_ws
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             let ctx = ws_ctx.clone();
             tokio::spawn(async move {
                 if let Err(e) = handle_ws(sock, ctx).await {
@@ -177,6 +186,9 @@ async fn handle_packet(
     ctx: &MqttContext,
     connect_seen: &mut bool,
 ) -> Result<()> {
+    ctx.metrics
+        .mqtt_packets_in
+        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     match pkt {
         Packet::Connect(_) => {
             *connect_seen = true;
@@ -231,8 +243,12 @@ async fn handle_packet(
                 broker: ctx.broker.clone(),
                 redis: ctx.redis.clone(),
                 enrich_zooms: ctx.cfg.enrich_zooms.clone(),
+                metrics: ctx.metrics.clone(),
             };
             ctx.broker.publish_local(&topic, payload.clone());
+            ctx.metrics
+                .mqtt_publish_local
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             let channel = format!("gmq:user:{topic}");
             let envelope = crate::redis::build_envelope(&ctx.redis.node_id, &payload);
             let _ = fred::interfaces::PubsubInterface::publish::<i64, _, _>(

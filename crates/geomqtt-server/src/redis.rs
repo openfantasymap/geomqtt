@@ -48,6 +48,7 @@ pub async fn connect(cfg: &Config) -> Result<RedisHandle> {
 pub async fn run_pubsub_bridge(
     redis: RedisHandle,
     broker: Arc<crate::broker::Broker>,
+    metrics: Arc<crate::metrics::Metrics>,
 ) -> Result<()> {
     // Subscribe to all tile and object channels via patterns.
     redis
@@ -76,6 +77,9 @@ pub async fn run_pubsub_bridge(
                     continue;
                 };
                 broker.publish_local(&topic, body.to_vec().into());
+                metrics
+                    .redis_bridge_messages
+                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             }
             Err(e) => {
                 warn!(error = %e, "pub/sub bridge recv error; retrying");
