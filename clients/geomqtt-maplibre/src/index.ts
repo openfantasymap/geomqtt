@@ -30,7 +30,9 @@ export interface GeomqttMaplibreOptions {
  * set. Pan/zoom events on the map drive the client's viewport subscriptions.
  */
 export class GeomqttSource {
-  private readonly client: GeomqttClient;
+  /** Underlying protocol client. Exposed read-only so callers can subscribe
+   *  to its event bus (e.g. `subscribed` / `unsubscribed` / `error`) for UI. */
+  public readonly client: GeomqttClient;
   private readonly sourceId: string;
   private readonly layerIds: string[] = [];
   private attached = false;

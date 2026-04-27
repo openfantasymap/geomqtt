@@ -9,6 +9,39 @@ const urlInput = document.getElementById("url") as HTMLInputElement;
 const setInput = document.getElementById("set") as HTMLInputElement;
 const button = document.getElementById("connect") as HTMLButtonElement;
 const status = document.getElementById("status") as HTMLDivElement;
+const topicsPanel = document.getElementById("topics") as HTMLDivElement;
+const topicsCount = document.getElementById("topics-count") as HTMLSpanElement;
+const activeList = document.getElementById("active") as HTMLDivElement;
+const logList = document.getElementById("log") as HTMLDivElement;
+
+const activeTopics = new Set<string>();
+const MAX_LOG = 30;
+
+function renderActive(): void {
+  topicsCount.textContent = String(activeTopics.size);
+  const sorted = Array.from(activeTopics).sort();
+  activeList.replaceChildren(
+    ...sorted.map((t) => {
+      const el = document.createElement("div");
+      el.textContent = t;
+      return el;
+    }),
+  );
+}
+
+function pushLog(op: "add" | "rm", topics: string[]): void {
+  const ts = new Date().toLocaleTimeString(undefined, { hour12: false });
+  for (const topic of topics) {
+    const row = document.createElement("div");
+    row.className = op;
+    row.innerHTML = `<span class="t">${ts}</span><span class="op">${op === "add" ? "+" : "−"}</span><span class="topic"></span>`;
+    (row.querySelector(".topic") as HTMLSpanElement).textContent = topic;
+    logList.prepend(row);
+  }
+  while (logList.childElementCount > MAX_LOG) {
+    logList.lastElementChild?.remove();
+  }
+}
 
 urlInput.value = initialUrl;
 setInput.value = initialSet;
@@ -47,6 +80,10 @@ async function connect(url: string, set: string): Promise<void> {
       source.detach();
       source = null;
     }
+    activeTopics.clear();
+    logList.replaceChildren();
+    renderActive();
+    topicsPanel.classList.remove("hidden");
     await waitForMapLoad();
     source = new GeomqttSource({
       map,
@@ -76,6 +113,17 @@ async function connect(url: string, set: string): Promise<void> {
           },
         },
       ],
+    });
+    source.client.on((ev) => {
+      if (ev.type === "subscribed") {
+        for (const t of ev.topics) activeTopics.add(t);
+        renderActive();
+        pushLog("add", ev.topics);
+      } else if (ev.type === "unsubscribed") {
+        for (const t of ev.topics) activeTopics.delete(t);
+        renderActive();
+        pushLog("rm", ev.topics);
+      }
     });
     await source.attach();
     setStatus(`Connected — set "${set}". Pan/zoom to subscribe to tiles.`);

@@ -100,10 +100,12 @@ export class GeomqttClient {
       this.mqtt?.unsubscribe(toUnsubscribe);
       for (const t of toUnsubscribe) this.tileSubs.delete(t);
       this.evictFeaturesNotInTopics(nextTopics, params.set, z);
+      this.emit({ type: "unsubscribed", topics: toUnsubscribe });
     }
     if (toSubscribe.length) {
       this.mqtt?.subscribe(toSubscribe, { qos: 0 });
       for (const t of toSubscribe) this.tileSubs.add(t);
+      this.emit({ type: "subscribed", topics: toSubscribe });
     }
     return tiles;
   }
@@ -113,6 +115,7 @@ export class GeomqttClient {
     if (this.objectSubs.has(topic)) return;
     this.mqtt?.subscribe(topic, { qos: 0 });
     this.objectSubs.add(topic);
+    this.emit({ type: "subscribed", topics: [topic] });
   }
 
   unsubscribeObject(obid: string): void {
@@ -120,6 +123,7 @@ export class GeomqttClient {
     if (!this.objectSubs.has(topic)) return;
     this.mqtt?.unsubscribe(topic);
     this.objectSubs.delete(topic);
+    this.emit({ type: "unsubscribed", topics: [topic] });
   }
 
   private emit(ev: GeomqttEvent): void {

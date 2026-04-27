@@ -67,4 +67,6 @@ export type GeomqttEvent =
   | { type: "feature-upsert"; feature: Feature; op: "snapshot" | "add" | "move" | "attr" }
   | { type: "feature-remove"; id: string }
   | { type: "object"; id: string; payload: ObjectPayload }
-  | { type: "error"; error: Error };
+  | { type: "error"; error: Error }
+  | { type: "subscribed"; topics: string[] }
+  | { type: "unsubscribed"; topics: string[] };
