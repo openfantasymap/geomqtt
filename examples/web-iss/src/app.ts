@@ -1,5 +1,14 @@
 import maplibregl from "maplibre-gl";
 import { GeomqttSource } from "@openfantasymap/geomqtt-maplibre";
+import { fetchServerConfig } from "@openfantasymap/geomqtt-core";
+
+/** Map a `ws[s]://host:port/<path>` to the matching `http[s]://host:port`. */
+function deriveHttpUrl(wsUrl: string): string {
+  const u = new URL(wsUrl);
+  u.protocol = u.protocol === "wss:" ? "https:" : "http:";
+  u.pathname = "/";
+  return u.toString().replace(/\/$/, "");
+}
 
 const params = new URLSearchParams(location.search);
 const initialUrl = params.get("url") ?? "";
@@ -85,15 +94,23 @@ async function connect(url: string, set: string): Promise<void> {
     renderActive();
     topicsPanel.classList.remove("hidden");
     await waitForMapLoad();
+
+    // Read the server's effective zoom list so we subscribe to exactly
+    // what it publishes. Falls back to the client default if /config is
+    // unreachable (e.g. an older server without CORS).
+    let publishedZooms: number[] | undefined;
+    try {
+      const cfg = await fetchServerConfig(deriveHttpUrl(url));
+      publishedZooms = cfg.zooms;
+    } catch {
+      publishedZooms = undefined;
+    }
+
     source = new GeomqttSource({
       map,
       url,
       set,
-      // Match the server's GEOMQTT_ENRICH_ZOOMS=1-20. Without this the
-      // client falls back to [6..12] and the demo only shows tile-tier
-      // subscriptions in that band. Once the server gains CORS we can
-      // replace this with `fetchServerConfig`.
-      publishedZooms: Array.from({ length: 20 }, (_, i) => i + 1),
+      publishedZooms,
       updateThrottleMs: 500,
       layers: [
         {

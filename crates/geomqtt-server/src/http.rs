@@ -13,6 +13,7 @@ use axum::{
 use serde::Deserialize;
 use serde_json::{json, Map, Value};
 use std::net::SocketAddr;
+use tower_http::cors::{Any, CorsLayer};
 use tracing::info;
 
 #[derive(Clone)]
@@ -21,6 +22,14 @@ pub struct HttpState {
 }
 
 pub async fn serve(addr: SocketAddr, state: HttpState) -> Result<()> {
+    // Read-only public endpoints with no credentials — `Any` is correct.
+    // Lets browser clients on github.io / map.fantasymaps.org / wherever
+    // call /config (and friends) cross-origin.
+    let cors = CorsLayer::new()
+        .allow_origin(Any)
+        .allow_methods(Any)
+        .allow_headers(Any);
+
     let app = Router::new()
         .route("/healthz", get(healthz))
         .route("/status", get(status_prom))
@@ -32,6 +41,7 @@ pub async fn serve(addr: SocketAddr, state: HttpState) -> Result<()> {
             state.clone(),
             count_request,
         ))
+        .layer(cors)
         .with_state(state);
 
     let listener = tokio::net::TcpListener::bind(addr).await?;
