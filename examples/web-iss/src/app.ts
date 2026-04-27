@@ -10,9 +10,12 @@ function deriveHttpUrl(wsUrl: string): string {
   return u.toString().replace(/\/$/, "");
 }
 
+type Projection = "globe" | "mercator";
+
 const params = new URLSearchParams(location.search);
 const initialUrl = params.get("url") ?? "";
 const initialSet = params.get("set") ?? "iss";
+const initialProj: Projection = params.get("proj") === "mercator" ? "mercator" : "globe";
 
 const urlInput = document.getElementById("url") as HTMLInputElement;
 const setInput = document.getElementById("set") as HTMLInputElement;
@@ -64,6 +67,27 @@ const map = new maplibregl.Map({
 });
 
 map.addControl(new maplibregl.NavigationControl(), "top-right");
+
+const projButtons = Array.from(
+  document.querySelectorAll<HTMLButtonElement>(".proj-btn"),
+);
+
+function setProjection(proj: Projection): void {
+  map.setProjection({ type: proj });
+  for (const b of projButtons) {
+    b.classList.toggle("active", b.dataset.proj === proj);
+  }
+  const loc = new URL(location.href);
+  if (proj === "globe") loc.searchParams.delete("proj");
+  else loc.searchParams.set("proj", proj);
+  history.replaceState(null, "", loc.toString());
+}
+
+for (const b of projButtons) {
+  b.addEventListener("click", () => setProjection(b.dataset.proj as Projection));
+}
+
+map.once("load", () => setProjection(initialProj));
 
 let source: GeomqttSource | null = null;
 
