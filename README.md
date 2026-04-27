@@ -266,7 +266,7 @@ npm run build
 - [x] CI + release automation (binaries, Docker, npm, UPM, GitHub Pages)
 - [x] `/status` Prometheus endpoint + process memory metrics
 - [x] ISS demo (`examples/iss-demo`) and static MapLibre web demo (`examples/web-iss`) with live subscription panel
-- [ ] CORS on the HTTP API so browsers can `fetchServerConfig()` cross-origin
+- [x] CORS on the HTTP API — `fetchServerConfig()` works cross-origin
 - [ ] Tile-side `attr` fanout (attribute-only updates also reach tile topics)
 - [ ] Lua-scripted atomic GEOADD + old-pos capture
 - [ ] `SPUBLISH` / `SSUBSCRIBE` for Redis Cluster sharded pub/sub
