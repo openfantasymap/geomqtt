@@ -46,9 +46,6 @@ jobs:
             archive: tar.gz
             cross_deps: gcc-aarch64-linux-gnu
             linker: aarch64-linux-gnu-gcc
-          - os: macos-13
-            target: x86_64-apple-darwin
-            archive: tar.gz
           - os: macos-14
             target: aarch64-apple-darwin
             archive: tar.gz

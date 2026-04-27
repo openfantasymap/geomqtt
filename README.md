@@ -6,15 +6,16 @@
 into a live, tile-keyed topic tree — so a web or game client can follow a
 moving viewport by subscribing to the tiles it can see.**
 
-[![ci](https://github.com/openfantasymap/geomqtt/actions/workflows/ci.yml/badge.svg)](https://github.com/openfantasymap/geomqtt/actions/workflows/ci.yml)
-[![tests](https://github.com/openfantasymap/geomqtt/actions/workflows/tests.yml/badge.svg)](https://github.com/openfantasymap/geomqtt/actions/workflows/tests.yml)
-[![npm](https://github.com/openfantasymap/geomqtt/actions/workflows/npm.yml/badge.svg)](https://github.com/openfantasymap/geomqtt/actions/workflows/npm.yml)
+[![ci](https://github.com/openfantasymap/geomqtt/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/openfantasymap/geomqtt/actions/workflows/ci.yml)
+[![tests](https://github.com/openfantasymap/geomqtt/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/openfantasymap/geomqtt/actions/workflows/tests.yml)
 [![release](https://github.com/openfantasymap/geomqtt/actions/workflows/release.yml/badge.svg)](https://github.com/openfantasymap/geomqtt/actions/workflows/release.yml)
-[![ghcr](https://img.shields.io/badge/ghcr.io-openfantasymap%2Fgeomqtt-2b3137?logo=docker)](https://github.com/openfantasymap/geomqtt/pkgs/container/geomqtt)
-[![gh packages](https://img.shields.io/badge/gh%20packages-%40openfantasymap%2Fgeomqtt--*-2b3137?logo=github)](https://github.com/openfantasymap/geomqtt/packages)
+[![npm](https://github.com/openfantasymap/geomqtt/actions/workflows/npm.yml/badge.svg)](https://github.com/openfantasymap/geomqtt/actions/workflows/npm.yml)
+[![pages](https://github.com/openfantasymap/geomqtt/actions/workflows/pages.yml/badge.svg)](https://openfantasymap.github.io/geomqtt/)
+[![ghcr](https://img.shields.io/github/v/release/openfantasymap/geomqtt?logo=docker&label=ghcr.io%2Fgeomqtt&color=2b3137)](https://github.com/openfantasymap/geomqtt/pkgs/container/geomqtt)
+[![demo](https://img.shields.io/badge/live%20demo-openfantasymap.github.io-ff5722?logo=maplibre)](https://openfantasymap.github.io/geomqtt/?url=wss://geomqtt.fantasymaps.org/mqtt&set=iss)
 [![license](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue)](#license)
 
-[Quick start](#-quick-start) · [Architecture](#-architecture) · [Clients](#-clients) · [Protocol](./PROTOCOL.md) · [Roadmap](#-roadmap)
+[Quick start](#-quick-start) · [Architecture](#-architecture) · [Clients](#-clients) · [Observability](#-observability) · [Protocol](./PROTOCOL.md) · [Roadmap](#-roadmap)
 
 </div>
 
@@ -27,8 +28,10 @@ moving viewport by subscribing to the tiles it can see.**
 - **Projects GEO sets onto slippy-map tiles.** Topic tree is `geo/<set>/<z>/<x>/<y>`; a map viewport is literally a set of tile subscriptions.
 - **Serves snapshots on subscribe.** Each new subscriber gets the current tile contents as a per-session burst (`GEOSEARCH`) followed by the live stream.
 - **Exposes GeoJSON over HTTP.** `/tiles/<set>/<z>/<x>/<y>`, `/viewport/<set>?bbox=…`, `/objects/<obid>` for non-live callers.
+- **Reports cheap Prometheus metrics.** `/status` emits in-process counters (sessions, tile fanouts, RESP commands) plus `process_resident_memory_bytes`. Every increment is a single atomic; rendering walks atomics + one `/proc/self/status` read.
 - **Scales horizontally.** Cross-node fanout rides on Redis pub/sub with a node-id envelope so nodes don't echo their own publishes.
-- **Ships four clients.** TypeScript for Leaflet and MapLibre, plus a Unity UPM package.
+- **Ships five clients.** TypeScript (Leaflet, MapLibre, core), Unity UPM, Unreal plugin.
+- **Has a live demo.** [`openfantasymap.github.io/geomqtt`](https://openfantasymap.github.io/geomqtt/?url=wss://geomqtt.fantasymaps.org/mqtt&set=iss) shows a public geomqtt instance tracking the ISS, with the active MQTT subscription set rolling in the corner.
 
 ## 📐 Architecture
 
@@ -84,8 +87,13 @@ curl http://localhost:8080/objects/iss
 
 A matching static web UI lives in [`examples/web-iss`](examples/web-iss/) —
 a MapLibre page that subscribes to the `iss` set and is published to
-GitHub Pages by `.github/workflows/pages.yml`. Point it at your own
-`wss://` geomqtt endpoint via the URL input (or `?url=wss://…`).
+GitHub Pages by `.github/workflows/pages.yml`. The bottom-left panel
+shows the active MQTT subscription set (and a rolling sub/unsub log) so
+you can watch the tile-keyed protocol in action as you pan the map.
+
+[**▶ Open the live demo**](https://openfantasymap.github.io/geomqtt/?url=wss://geomqtt.fantasymaps.org/mqtt&set=iss)
+— points at a public deployment at `wss://geomqtt.fantasymaps.org/mqtt`.
+Override `?url=wss://your-host:8083` to point it at your own.
 
 ## 📦 Install
 
@@ -134,6 +142,36 @@ All config is via environment variables:
 `log2(256 / tile_size)`. For example, `GEOMQTT_ENRICH_ZOOMS=6-12,
 GEOMQTT_TILE_SIZE=128` publishes on effective zooms `7-13`. The effective
 list is returned by `GET /config` so clients can mirror it.
+
+## 📊 Observability
+
+`GET /status` returns Prometheus-format text. Counters increment at hot
+paths via `AtomicU64::fetch_add(Relaxed)`; gauges resolve from the broker
+session table or one `/proc/self/status` read. No background ticker, no
+allocator hooks, no Redis round-trips on a scrape.
+
+```text
+geomqtt_build_info{version="0.1.2",node_id="…"} 1
+geomqtt_uptime_seconds 1234.5
+geomqtt_mqtt_sessions 4
+geomqtt_mqtt_subscriptions 71
+geomqtt_mqtt_connections_total{transport="ws"} 42
+geomqtt_mqtt_packets_received_total 318
+geomqtt_resp_commands_total 1024
+geomqtt_resp_geo_writes_total 220
+geomqtt_tile_fanouts_total 1540
+geomqtt_object_fanouts_total 12
+geomqtt_redis_bridge_messages_total 87
+geomqtt_http_requests_total 60
+process_resident_memory_bytes 12345678
+process_virtual_memory_bytes  2861531136
+process_resident_memory_max_bytes 14000000
+```
+
+Point a Prometheus scrape config at `http://<host>:8080/status` (use the
+canonical metrics path of your scraper — geomqtt does not enforce the
+`/metrics` convention so it can keep `/healthz` / `/config` /
+`/tiles` / `/viewport` / `/objects` cohesive on `:8080`).
 
 ## 🧭 Clients
 
@@ -186,7 +224,8 @@ npm run build
 │           ├── mqtt.rs         # embedded MQTT broker (TCP + WS)
 │           ├── broker.rs       # in-memory session registry + fanout
 │           ├── fanout.rs       # point → tile events (add/move/remove)
-│           ├── http.rs         # axum router for GeoJSON + /config + /healthz
+│           ├── http.rs         # axum router: GeoJSON + /config + /healthz + /status
+│           ├── metrics.rs      # AtomicU64 counters + Prometheus text rendering
 │           ├── payload.rs      # JSON payloads (mirrored in client packages)
 │           └── redis.rs        # fred client + cross-node pub/sub bridge
 ├── clients/
@@ -195,11 +234,15 @@ npm run build
 │   ├── geomqtt-maplibre/       # @openfantasymap/geomqtt-maplibre
 │   ├── geomqtt-unity/          # com.geomqtt.unity (UPM)
 │   └── geomqtt-unreal/         # Unreal Engine plugin (UE 5.3+, built-in MQTT codec over WS)
+├── examples/
+│   ├── iss-demo/               # alpine sidecar polling api.open-notify.org → RESP
+│   └── web-iss/                # static MapLibre demo (esbuild → GitHub Pages)
 ├── .github/workflows/
 │   ├── ci.yml                  # Rust fmt + clippy, TS build + typecheck
 │   ├── tests.yml               # Rust unit + integration (Redis service), TS vitest
 │   ├── npm.yml                 # Publishes @openfantasymap/geomqtt-* to GH Packages
-│   └── release.yml             # Cross-platform binaries + Docker (GHCR) + UPM branch
+│   ├── release.yml             # Binaries + Docker (geomqtt + geomqtt-iss-demo) + UPM split
+│   └── pages.yml               # Builds + deploys the web demo to GitHub Pages
 ├── Dockerfile
 ├── docker-compose.yml
 ├── PROTOCOL.md                 # wire contract
@@ -220,7 +263,10 @@ npm run build
 - [x] `@openfantasymap/geomqtt-{core,leaflet,maplibre}` TS packages on GH Packages
 - [x] Unity UPM package with `GeomqttClient` + `GeomqttWorld3D`
 - [x] Unreal Engine plugin (`UGeomqttClient` + `AGeomqttMarkerSpawner`, built-in MQTT codec)
-- [x] CI + release automation (binaries, Docker, npm, UPM)
+- [x] CI + release automation (binaries, Docker, npm, UPM, GitHub Pages)
+- [x] `/status` Prometheus endpoint + process memory metrics
+- [x] ISS demo (`examples/iss-demo`) and static MapLibre web demo (`examples/web-iss`) with live subscription panel
+- [ ] CORS on the HTTP API so browsers can `fetchServerConfig()` cross-origin
 - [ ] Tile-side `attr` fanout (attribute-only updates also reach tile topics)
 - [ ] Lua-scripted atomic GEOADD + old-pos capture
 - [ ] `SPUBLISH` / `SSUBSCRIBE` for Redis Cluster sharded pub/sub
