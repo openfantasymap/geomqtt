@@ -89,6 +89,11 @@ async function connect(url: string, set: string): Promise<void> {
       map,
       url,
       set,
+      // Match the server's GEOMQTT_ENRICH_ZOOMS=1-20. Without this the
+      // client falls back to [6..12] and the demo only shows tile-tier
+      // subscriptions in that band. Once the server gains CORS we can
+      // replace this with `fetchServerConfig`.
+      publishedZooms: Array.from({ length: 20 }, (_, i) => i + 1),
       updateThrottleMs: 500,
       layers: [
         {
