@@ -1,0 +1,94 @@
+# Docker Swarm stack using the published GHCR images, fronted by Traefik.
+#
+# Routes (single hostname, path-split):
+#   https://geomqtt.fantasymaps.org/         → port 8080 (HTTP / GeoJSON / /healthz / /config)
+#   wss://geomqtt.fantasymaps.org/mqtt       → port 8083 (MQTT over WebSocket — clients)
+#
+# Direct RESP (port 6380) and raw MQTT TCP (1883) are NOT exposed by this
+# stack: they're only useful inside the overlay (the bundled iss-demo
+# sidecar talks RESP to `geomqtt:6380`). Add `mode: host` ports if you need
+# them externally.
+#
+# Deploy:    docker stack deploy -c docker-stack.yml geomqtt
+# Inspect:   docker stack services geomqtt
+# Tear down: docker stack rm geomqtt
+version: "3.8"
+
+services:
+  redis:
+    image: redis:7-alpine
+    networks: [geomqtt]
+    volumes:
+      - redis-data:/data
+    deploy:
+      replicas: 1
+      placement:
+        constraints: [node.role == manager]
+      restart_policy:
+        condition: any
+
+  geomqtt:
+    image: ghcr.io/openfantasymap/geomqtt:latest
+    depends_on: [redis]
+    networks:
+      - geomqtt
+      - traefik-ofm
+    environment:
+      GEOMQTT_REDIS_URL: redis://redis:6379
+      GEOMQTT_ENRICH_ATTRS: icon,color,type,status
+      GEOMQTT_ENRICH_ZOOMS: "6-12"
+      GEOMQTT_TILE_SIZE: "256"
+      RUST_LOG: info,geomqtt_server=debug
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: any
+        delay: 5s
+      labels:
+        traefik.enable: "true"
+        traefik.docker.network: "traefik-ofm"
+
+        # ── HTTP API ──────────────────────────────────────────────
+        traefik.http.routers.geomqtt-api.rule: "Host(`geomqtt.fantasymaps.org`)"
+        traefik.http.routers.geomqtt-api.entrypoints: "websecure"
+        traefik.http.routers.geomqtt-api.tls.certresolver: "secure"
+        traefik.http.routers.geomqtt-api.tls.domains[0].main: "geomqtt.fantasymaps.org"
+        traefik.http.routers.geomqtt-api.service: "geomqtt-api-svc"
+        traefik.http.routers.geomqtt-api.priority: "100"
+        traefik.http.services.geomqtt-api-svc.loadbalancer.server.port: "8080"
+        traefik.http.services.geomqtt-api-svc.loadbalancer.passHostHeader: "true"
+
+        # ── MQTT over WebSocket ───────────────────────────────────
+        traefik.http.routers.geomqtt-mqtt.rule: "Host(`geomqtt.fantasymaps.org`) && PathPrefix(`/mqtt`)"
+        traefik.http.routers.geomqtt-mqtt.entrypoints: "websecure"
+        traefik.http.routers.geomqtt-mqtt.tls.certresolver: "secure"
+        traefik.http.routers.geomqtt-mqtt.tls.domains[0].main: "geomqtt.fantasymaps.org"
+        traefik.http.routers.geomqtt-mqtt.service: "geomqtt-mqtt-svc"
+        traefik.http.routers.geomqtt-mqtt.priority: "200"
+        traefik.http.services.geomqtt-mqtt-svc.loadbalancer.server.port: "8083"
+
+  iss-demo:
+    image: ghcr.io/openfantasymap/geomqtt-iss-demo:latest
+    depends_on: [geomqtt]
+    networks: [geomqtt]
+    environment:
+      GEOMQTT_HOST: geomqtt
+      GEOMQTT_PORT: "6380"
+      GEOMQTT_SET: iss
+      GEOMQTT_OBID: iss
+      INTERVAL: "5"
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: any
+        delay: 5s
+
+networks:
+  geomqtt:
+    driver: overlay
+    attachable: true
+  traefik-ofm:
+    external: true
+
+volumes:
+  redis-data:
