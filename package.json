@@ -1,8 +1,8 @@
 {
   "name": "com.geomqtt.unity",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "displayName": "geomqtt for Unity",
-  "description": "Unity client for a geomqtt server. Subscribes to tiles covering an area of interest and exposes add/move/remove events for objects. Supports both flat 2D map overlays and 3D world-anchored scenes (lat/lng → local ENU meters).",
+  "description": "Unity client for a geomqtt server. Subscribes to tiles covering an area of interest and exposes add/move/remove events for objects. Supports both flat 2D map overlays and 3D world-anchored scenes (lat/lng \u2192 local ENU meters).",
   "unity": "2022.3",
   "license": "MIT OR Apache-2.0",
   "dependencies": {
