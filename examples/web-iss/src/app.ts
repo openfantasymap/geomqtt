@@ -15,7 +15,7 @@ type Projection = "globe" | "mercator";
 const params = new URLSearchParams(location.search);
 const initialUrl = params.get("url") ?? "";
 const initialSet = params.get("set") ?? "iss";
-const initialProj: Projection = params.get("proj") === "mercator" ? "mercator" : "globe";
+const initialProj: Projection = params.get("proj") === "globe" ? "globe" : "mercator";
 
 const urlInput = document.getElementById("url") as HTMLInputElement;
 const setInput = document.getElementById("set") as HTMLInputElement;
@@ -78,7 +78,7 @@ function setProjection(proj: Projection): void {
     b.classList.toggle("active", b.dataset.proj === proj);
   }
   const loc = new URL(location.href);
-  if (proj === "globe") loc.searchParams.delete("proj");
+  if (proj === "mercator") loc.searchParams.delete("proj");
   else loc.searchParams.set("proj", proj);
   history.replaceState(null, "", loc.toString());
 }
@@ -160,6 +160,7 @@ async function connect(url: string, set: string): Promise<void> {
         },
       ],
     });
+    let recentered = false;
     source.client.on((ev) => {
       if (ev.type === "subscribed") {
         for (const t of ev.topics) activeTopics.add(t);
@@ -169,6 +170,13 @@ async function connect(url: string, set: string): Promise<void> {
         for (const t of ev.topics) activeTopics.delete(t);
         renderActive();
         pushLog("rm", ev.topics);
+      } else if (ev.type === "feature-upsert" && !recentered) {
+        // First feature in: fly to it once so the user actually sees the
+        // dot on load (otherwise it can be on the antipodes, especially in
+        // globe). Subsequent updates leave the camera alone.
+        recentered = true;
+        const { lat, lng } = ev.feature;
+        map.flyTo({ center: [lng, lat], zoom: 3, speed: 1.4, curve: 1.6 });
       }
     });
     await source.attach();
