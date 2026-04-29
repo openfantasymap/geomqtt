@@ -29,6 +29,7 @@ moving viewport by subscribing to the tiles it can see.**
 - **Serves snapshots on subscribe.** Each new subscriber gets the current tile contents as a per-session burst (`GEOSEARCH`) followed by the live stream.
 - **Exposes GeoJSON over HTTP.** `/tiles/<set>/<z>/<x>/<y>`, `/viewport/<set>?bbox=…`, `/objects/<obid>` for non-live callers.
 - **Reports cheap Prometheus metrics.** `/status` emits in-process counters (sessions, tile fanouts, RESP commands) plus `process_resident_memory_bytes`. Every increment is a single atomic; rendering walks atomics + one `/proc/self/status` read.
+- **Mirrors writes to InfluxDB (optional).** When `GEOMQTT_INFLUX_URL` is set, intercepted `GEOADD` positions and `HSET` attribute writes also flow as line-protocol points via a bounded mpsc + batching task — fire-and-forget on the hot path, zero-cost when disabled.
 - **Scales horizontally.** Cross-node fanout rides on Redis pub/sub with a node-id envelope so nodes don't echo their own publishes.
 - **Ships five clients.** TypeScript (Leaflet, MapLibre, core), Unity UPM, Unreal plugin.
 - **Has a live demo.** [`openfantasymap.github.io/geomqtt`](https://openfantasymap.github.io/geomqtt/?url=wss://geomqtt.fantasymaps.org/mqtt&set=iss) shows a public geomqtt instance tracking the ISS, with the active MQTT subscription set rolling in the corner.
@@ -172,7 +173,7 @@ session table or one `/proc/self/status` read. No background ticker, no
 allocator hooks, no Redis round-trips on a scrape.
 
 ```text
-geomqtt_build_info{version="0.1.2",node_id="…"} 1
+geomqtt_build_info{version="0.4.0",node_id="…"} 1
 geomqtt_uptime_seconds 1234.5
 geomqtt_mqtt_sessions 4
 geomqtt_mqtt_subscriptions 71
@@ -184,6 +185,10 @@ geomqtt_tile_fanouts_total 1540
 geomqtt_object_fanouts_total 12
 geomqtt_redis_bridge_messages_total 87
 geomqtt_http_requests_total 60
+geomqtt_influx_writes_enqueued_total 220
+geomqtt_influx_writes_dropped_total 0
+geomqtt_influx_batches_sent_total 18
+geomqtt_influx_batch_errors_total 0
 process_resident_memory_bytes 12345678
 process_virtual_memory_bytes  2861531136
 process_resident_memory_max_bytes 14000000
@@ -289,6 +294,7 @@ npm run build
 - [x] `/status` Prometheus endpoint + process memory metrics
 - [x] ISS demo (`examples/iss-demo`) and static MapLibre web demo (`examples/web-iss`) with live subscription panel
 - [x] CORS on the HTTP API — `fetchServerConfig()` works cross-origin
+- [x] Optional InfluxDB 2.x sink for `GEOADD` positions + `HSET` attribute writes
 - [ ] Tile-side `attr` fanout (attribute-only updates also reach tile topics)
 - [ ] Lua-scripted atomic GEOADD + old-pos capture
 - [ ] `SPUBLISH` / `SSUBSCRIBE` for Redis Cluster sharded pub/sub
