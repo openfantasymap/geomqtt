@@ -244,6 +244,7 @@ async fn handle_packet(
                 redis: ctx.redis.clone(),
                 enrich_zooms: ctx.cfg.enrich_zooms.clone(),
                 metrics: ctx.metrics.clone(),
+                influx: None,
             };
             ctx.broker.publish_local(&topic, payload.clone());
             ctx.metrics

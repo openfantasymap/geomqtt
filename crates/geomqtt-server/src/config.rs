@@ -2,6 +2,14 @@ use anyhow::{anyhow, Context, Result};
 use std::net::SocketAddr;
 
 #[derive(Debug, Clone)]
+pub struct InfluxSettings {
+    pub url: String,
+    pub token: String,
+    pub org: String,
+    pub bucket: String,
+}
+
+#[derive(Debug, Clone)]
 pub struct Config {
     pub redis_url: String,
     pub resp_addr: SocketAddr,
@@ -19,6 +27,8 @@ pub struct Config {
     /// 1 = max granularity. Must be a power of two ≤ 256.
     pub tile_size: u16,
     pub object_key_prefix: String,
+    /// Optional InfluxDB 2.x sink. `None` = feature disabled.
+    pub influx: Option<InfluxSettings>,
 }
 
 impl Config {
@@ -33,6 +43,16 @@ impl Config {
             .map(|z| z.saturating_add(zoom_offset))
             .collect();
 
+        let influx = match env_or("GEOMQTT_INFLUX_URL", "") {
+            ref s if s.is_empty() => None,
+            url => Some(InfluxSettings {
+                url: url.trim_end_matches('/').to_string(),
+                token: env_or("GEOMQTT_INFLUX_TOKEN", ""),
+                org: env_or("GEOMQTT_INFLUX_ORG", ""),
+                bucket: env_or("GEOMQTT_INFLUX_BUCKET", ""),
+            }),
+        };
+
         Ok(Self {
             redis_url: env_or("GEOMQTT_REDIS_URL", "redis://127.0.0.1:6379"),
             resp_addr: parse_addr("GEOMQTT_RESP_ADDR", "0.0.0.0:6380")?,
@@ -44,6 +64,7 @@ impl Config {
             enrich_zooms,
             tile_size,
             object_key_prefix: env_or("GEOMQTT_OBJECT_KEY_PREFIX", "obj:"),
+            influx,
         })
     }
 }

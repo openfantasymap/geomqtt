@@ -136,12 +136,33 @@ All config is via environment variables:
 | `GEOMQTT_ENRICH_ZOOMS`        | `6-12`                    | Zoom levels that receive tile-topic publishes. Accepts ranges (`6-12`) and mixed lists (`4,6-10,14`) |
 | `GEOMQTT_TILE_SIZE`           | `256`                     | Tile edge in pixels, power of 2 in `1..=256`. Smaller = finer granularity (`128` doubles tile count per zoom) |
 | `GEOMQTT_OBJECT_KEY_PREFIX`   | `obj:`                    | Prefix for the per-object attribute hash          |
+| `GEOMQTT_INFLUX_URL`          | *(empty)*                 | InfluxDB 2.x base URL (e.g. `https://influx.example.com`). When unset, the sink is disabled and zero-cost. |
+| `GEOMQTT_INFLUX_TOKEN`        | *(empty)*                 | Influx API token (used as `Authorization: Token <…>`) |
+| `GEOMQTT_INFLUX_ORG`          | *(empty)*                 | Influx organization name                          |
+| `GEOMQTT_INFLUX_BUCKET`       | *(empty)*                 | Influx bucket name                                |
 | `RUST_LOG`                    | `info`                    | `tracing-subscriber` filter                       |
 
 `GEOMQTT_TILE_SIZE` shifts every configured zoom upward by
 `log2(256 / tile_size)`. For example, `GEOMQTT_ENRICH_ZOOMS=6-12,
 GEOMQTT_TILE_SIZE=128` publishes on effective zooms `7-13`. The effective
 list is returned by `GET /config` so clients can mirror it.
+
+### Optional InfluxDB sink
+
+If `GEOMQTT_INFLUX_URL` is set, every intercepted geo write also gets
+mirrored as a time-series point. A bounded mpsc queue (4096 entries) and
+a background batching task isolate Influx latency from the RESP hot path
+— `try_send` drops on overflow and bumps `geomqtt_influx_writes_dropped_total`
+rather than blocking. Two measurements are written, both via
+`/api/v2/write` line protocol:
+
+```text
+geomqtt_position,set=<set>,obid=<member> lat=<lat>,lon=<lon>
+geomqtt_attr,obid=<obid> <key>="<value>"[,<key>="<value>"…]
+```
+
+Position points come from `GEOADD`, attribute points from `HSET`/`HMSET`
+on `obj:*` keys. Timestamps are assigned server-side by Influx.
 
 ## 📊 Observability
 
@@ -226,6 +247,7 @@ npm run build
 │           ├── fanout.rs       # point → tile events (add/move/remove)
 │           ├── http.rs         # axum router: GeoJSON + /config + /healthz + /status
 │           ├── metrics.rs      # AtomicU64 counters + Prometheus text rendering
+│           ├── influx.rs       # optional InfluxDB 2.x sink (bounded mpsc + batching)
 │           ├── payload.rs      # JSON payloads (mirrored in client packages)
 │           └── redis.rs        # fred client + cross-node pub/sub bridge
 ├── clients/

@@ -31,6 +31,7 @@ pub struct RespContext {
     pub redis: RedisHandle,
     pub cfg: Arc<Config>,
     pub metrics: Arc<crate::metrics::Metrics>,
+    pub influx: Option<Arc<crate::influx::InfluxClient>>,
 }
 
 pub async fn serve(addr: SocketAddr, ctx: RespContext) -> Result<()> {
@@ -122,6 +123,7 @@ async fn handle_command(frame: Resp2Frame, ctx: &RespContext) -> Resp2Frame {
         redis: ctx.redis.clone(),
         enrich_zooms: ctx.cfg.enrich_zooms.clone(),
         metrics: ctx.metrics.clone(),
+        influx: ctx.influx.clone(),
     };
     match cmd.as_str() {
         "GEOADD" => {

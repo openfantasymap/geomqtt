@@ -21,6 +21,10 @@ pub struct Metrics {
     pub object_fanouts: AtomicU64,
     pub redis_bridge_messages: AtomicU64,
     pub http_requests: AtomicU64,
+    pub influx_writes_enqueued: AtomicU64,
+    pub influx_writes_dropped: AtomicU64,
+    pub influx_batches_sent: AtomicU64,
+    pub influx_batch_errors: AtomicU64,
 }
 
 impl Metrics {
@@ -37,6 +41,10 @@ impl Metrics {
             object_fanouts: AtomicU64::new(0),
             redis_bridge_messages: AtomicU64::new(0),
             http_requests: AtomicU64::new(0),
+            influx_writes_enqueued: AtomicU64::new(0),
+            influx_writes_dropped: AtomicU64::new(0),
+            influx_batches_sent: AtomicU64::new(0),
+            influx_batch_errors: AtomicU64::new(0),
         })
     }
 
@@ -171,6 +179,41 @@ impl Metrics {
             s,
             "geomqtt_http_requests_total {}",
             load(&self.http_requests)
+        );
+
+        let _ = writeln!(s, "# HELP geomqtt_influx_writes_enqueued_total Cumulative line-protocol points handed to the Influx writer task");
+        let _ = writeln!(s, "# TYPE geomqtt_influx_writes_enqueued_total counter");
+        let _ = writeln!(
+            s,
+            "geomqtt_influx_writes_enqueued_total {}",
+            load(&self.influx_writes_enqueued)
+        );
+        let _ = writeln!(s, "# HELP geomqtt_influx_writes_dropped_total Cumulative line-protocol points dropped because the writer queue was full");
+        let _ = writeln!(s, "# TYPE geomqtt_influx_writes_dropped_total counter");
+        let _ = writeln!(
+            s,
+            "geomqtt_influx_writes_dropped_total {}",
+            load(&self.influx_writes_dropped)
+        );
+        let _ = writeln!(
+            s,
+            "# HELP geomqtt_influx_batches_sent_total Cumulative successful HTTP POSTs to /api/v2/write"
+        );
+        let _ = writeln!(s, "# TYPE geomqtt_influx_batches_sent_total counter");
+        let _ = writeln!(
+            s,
+            "geomqtt_influx_batches_sent_total {}",
+            load(&self.influx_batches_sent)
+        );
+        let _ = writeln!(
+            s,
+            "# HELP geomqtt_influx_batch_errors_total Cumulative failed HTTP POSTs to /api/v2/write"
+        );
+        let _ = writeln!(s, "# TYPE geomqtt_influx_batch_errors_total counter");
+        let _ = writeln!(
+            s,
+            "geomqtt_influx_batch_errors_total {}",
+            load(&self.influx_batch_errors)
         );
 
         s

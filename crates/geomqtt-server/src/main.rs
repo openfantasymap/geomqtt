@@ -3,6 +3,7 @@ mod config;
 mod coord;
 mod fanout;
 mod http;
+mod influx;
 mod metrics;
 mod mqtt;
 mod payload;
@@ -28,6 +29,10 @@ async fn main() -> Result<()> {
     let redis = redis::connect(&cfg).await?;
     let broker = broker::Broker::new();
     let metrics = metrics::Metrics::new();
+    let influx = cfg
+        .influx
+        .clone()
+        .map(|s| influx::InfluxClient::spawn(s, metrics.clone()));
 
     let mqtt_ctx = mqtt::MqttContext {
         broker: broker.clone(),
@@ -40,6 +45,7 @@ async fn main() -> Result<()> {
         redis: redis.clone(),
         cfg: cfg.clone(),
         metrics: metrics.clone(),
+        influx: influx.clone(),
     };
     let http_state = http::HttpState {
         ctx: mqtt_ctx.clone(),

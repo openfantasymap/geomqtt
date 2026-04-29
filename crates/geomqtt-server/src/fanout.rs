@@ -8,6 +8,7 @@
 
 use crate::broker::Broker;
 use crate::coord;
+use crate::influx::InfluxClient;
 use crate::payload::{
     redis_object_channel, redis_tile_channel, tile_topic, ObjectPayload, TilePayload,
 };
@@ -22,6 +23,7 @@ pub struct Fanout {
     pub redis: RedisHandle,
     pub enrich_zooms: Vec<u8>,
     pub metrics: Arc<crate::metrics::Metrics>,
+    pub influx: Option<Arc<InfluxClient>>,
 }
 
 impl Fanout {
@@ -51,6 +53,9 @@ impl Fanout {
         self.metrics
             .object_fanouts
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        if let (Some(influx), ObjectPayload::Attr { attrs, .. }) = (self.influx.as_ref(), payload) {
+            influx.attr(obid, attrs);
+        }
         let channel = redis_object_channel(obid);
         let envelope = build_envelope(&self.redis.node_id, &body);
         if let Err(e) = self
@@ -75,6 +80,9 @@ impl Fanout {
         attrs: Map<String, Value>,
     ) {
         let (new_lon, new_lat) = new_pos;
+        if let Some(influx) = self.influx.as_ref() {
+            influx.position(set, member, new_lon, new_lat);
+        }
         let new_tiles = coord::tiles_for_point(&self.enrich_zooms, new_lat, new_lon);
         let old_tiles: Vec<(u8, u32, u32)> = old_pos
             .map(|(lon, lat)| coord::tiles_for_point(&self.enrich_zooms, lat, lon))
