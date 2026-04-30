@@ -16,7 +16,6 @@ fn is_empty(m: &Map<String, Value>) -> bool {
 
 #[derive(Serialize)]
 #[serde(tag = "op", rename_all = "lowercase")]
-#[allow(dead_code)] // `Attr` is reserved for tile-side attribute fanout (v0.2)
 pub enum TilePayload {
     Snapshot {
         id: String,
@@ -81,7 +80,6 @@ impl TilePayload {
     pub fn remove(id: String) -> Self {
         Self::Remove { id, ts: now_ms() }
     }
-    #[allow(dead_code)]
     pub fn attr(id: String, attrs: Map<String, Value>) -> Self {
         Self::Attr {
             id,

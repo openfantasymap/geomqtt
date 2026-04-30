@@ -83,7 +83,9 @@ crates/geomqtt-server/src/
 
 * `GEOADD` / `HSET` via RESP proxy (port 6380) → fans out `snapshot` / `add` /
   `move` / `remove` on `geo/<set>/<z>/<x>/<y>` and attribute events on
-  `objects/<obid>`.
+  `objects/<obid>`. `HSET` also emits `attr` messages on every tile the
+  object currently covers (filtered to `GEOMQTT_ENRICH_ATTRS`); set
+  membership for the lookup is maintained in `gmq:inset:<obid>`.
 * MQTT SUBSCRIBE (TCP port 1883, WS port 8083) triggers a per-subscriber
   `snapshot` burst backed by `GEOSEARCH` for tile topics and `HGETALL` for
   object topics.
@@ -95,11 +97,6 @@ crates/geomqtt-server/src/
 
 Known gaps:
 
-* **Tile-side `attr` fanout** is not wired yet (marked `#[allow(dead_code)]`
-  on `TilePayload::Attr` and `TilePayload::attr()`). v0.2 work: on `HSET`
-  of a tracked `obj:*` key, look up which sets the object is in (needs a
-  `gmq:inset:<obid>` Redis set updated on GEOADD) and fan out an `attr`
-  message to each currently-live tile.
 * **No Lua script** for atomic GEOADD + old-position fetch. Current flow
   is two pipelined commands (GEOPOS then GEOADD); race-prone if a single
   member is updated from two clients simultaneously.

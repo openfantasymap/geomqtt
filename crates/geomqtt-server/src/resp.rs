@@ -229,8 +229,20 @@ async fn handle_hash_write(ctx: &RespContext, fanout: &Fanout, args: &[String], 
             i += 2;
         }
     }
-    let payload = ObjectPayload::attr(obid.to_string(), attrs);
+    let payload = ObjectPayload::attr(obid.to_string(), attrs.clone());
     fanout.publish_object(obid, &payload).await;
+
+    // Tile-side attr fanout: only the fields named in GEOMQTT_ENRICH_ATTRS
+    // travel on tile topics (bandwidth budget — many subscribers per tile).
+    if !is_del && !ctx.cfg.enrich_attrs.is_empty() && !attrs.is_empty() {
+        let tile_attrs: Map<String, Value> = attrs
+            .into_iter()
+            .filter(|(k, _)| ctx.cfg.enrich_attrs.iter().any(|f| f == k))
+            .collect();
+        if !tile_attrs.is_empty() {
+            fanout.on_attr_tile(obid, tile_attrs).await;
+        }
+    }
 }
 
 async fn handle_del(ctx: &RespContext, fanout: &Fanout, args: &[String]) {

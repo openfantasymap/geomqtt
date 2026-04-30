@@ -13,7 +13,7 @@ use crate::payload::{
     redis_object_channel, redis_tile_channel, tile_topic, ObjectPayload, TilePayload,
 };
 use crate::redis::{build_envelope, RedisHandle};
-use fred::interfaces::PubsubInterface;
+use fred::interfaces::{GeoInterface, PubsubInterface, SetsInterface};
 use serde_json::{Map, Value};
 use std::sync::Arc;
 use tracing::warn;
@@ -110,6 +110,19 @@ impl Fanout {
                 }
             }
         }
+
+        // Record set membership so HSET attribute deltas know which tiles
+        // to fan out to. Best-effort: a failure here only degrades attr
+        // fanout, never the position-side path.
+        let key = inset_key(member);
+        if let Err(e) = self
+            .redis
+            .client
+            .sadd::<i64, _, _>(key, set.to_string())
+            .await
+        {
+            warn!(error = %e, "sadd gmq:inset failed");
+        }
     }
 
     /// After a ZREM on a geo set.
@@ -119,5 +132,59 @@ impl Fanout {
             let p = TilePayload::remove(member.to_string());
             self.publish_tile(set, z, x, y, &p).await;
         }
+        let key = inset_key(member);
+        if let Err(e) = self
+            .redis
+            .client
+            .srem::<i64, _, _>(key, set.to_string())
+            .await
+        {
+            warn!(error = %e, "srem gmq:inset failed");
+        }
     }
+
+    /// After an `HSET` on `obj:<obid>` with at least one field that's in
+    /// `enrich_attrs`. Looks up which sets the object lives in
+    /// (`SMEMBERS gmq:inset:<obid>`), gets its current position per set
+    /// (`GEOPOS`), and publishes a `TilePayload::Attr` to every covering
+    /// tile so live subscribers can patch their feature in place without a
+    /// fresh `objects/<obid>` round-trip.
+    pub async fn on_attr_tile(&self, obid: &str, attrs: Map<String, Value>) {
+        if attrs.is_empty() {
+            return;
+        }
+        let key = inset_key(obid);
+        let sets: Vec<String> = match self.redis.client.smembers(key).await {
+            Ok(s) => s,
+            Err(e) => {
+                warn!(error = %e, "smembers gmq:inset failed");
+                return;
+            }
+        };
+        for set in sets {
+            let positions: Vec<Option<(f64, f64)>> = match self
+                .redis
+                .client
+                .geopos(&set, vec![obid.to_string()])
+                .await
+            {
+                Ok(p) => p,
+                Err(e) => {
+                    warn!(error = %e, set = %set, "geopos for attr fanout failed");
+                    continue;
+                }
+            };
+            let Some(Some((lon, lat))) = positions.into_iter().next() else {
+                continue;
+            };
+            for (z, x, y) in coord::tiles_for_point(&self.enrich_zooms, lat, lon) {
+                let p = TilePayload::attr(obid.to_string(), attrs.clone());
+                self.publish_tile(&set, z, x, y, &p).await;
+            }
+        }
+    }
+}
+
+fn inset_key(obid: &str) -> String {
+    format!("gmq:inset:{obid}")
 }

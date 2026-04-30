@@ -25,7 +25,7 @@ moving viewport by subscribing to the tiles it can see.**
 
 - **Proxies Redis (RESP).** Every standard command forwards to an upstream Redis; `GEOADD` / `ZREM` / `HSET` / `HDEL` / `DEL` on `obj:*` keys are intercepted to trigger MQTT fanout.
 - **Embeds an MQTT broker.** QoS 0, clean session, over both raw TCP (`1883`) and WebSocket (`8083`). Browser clients just connect over WS — no extra bridge.
-- **Projects GEO sets onto slippy-map tiles.** Topic tree is `geo/<set>/<z>/<x>/<y>`; a map viewport is literally a set of tile subscriptions.
+- **Projects GEO sets onto slippy-map tiles.** Topic tree is `geo/<set>/<z>/<x>/<y>`; a map viewport is literally a set of tile subscriptions. `HSET` on a tracked object also fans `attr` deltas onto every tile the object currently covers, so live subscribers patch features in place without an `objects/<obid>` round-trip.
 - **Serves snapshots on subscribe.** Each new subscriber gets the current tile contents as a per-session burst (`GEOSEARCH`) followed by the live stream.
 - **Exposes GeoJSON over HTTP.** `/tiles/<set>/<z>/<x>/<y>`, `/viewport/<set>?bbox=…`, `/objects/<obid>` for non-live callers.
 - **Reports cheap Prometheus metrics.** `/status` emits in-process counters (sessions, tile fanouts, RESP commands) plus `process_resident_memory_bytes`. Every increment is a single atomic; rendering walks atomics + one `/proc/self/status` read.
@@ -295,7 +295,7 @@ npm run build
 - [x] ISS demo (`examples/iss-demo`) and static MapLibre web demo (`examples/web-iss`) with live subscription panel
 - [x] CORS on the HTTP API — `fetchServerConfig()` works cross-origin
 - [x] Optional InfluxDB 2.x sink for `GEOADD` positions + `HSET` attribute writes
-- [ ] Tile-side `attr` fanout (attribute-only updates also reach tile topics)
+- [x] Tile-side `attr` fanout — `HSET` on `obj:*` reaches every currently-covering tile
 - [ ] Lua-scripted atomic GEOADD + old-pos capture
 - [ ] `SPUBLISH` / `SSUBSCRIBE` for Redis Cluster sharded pub/sub
 

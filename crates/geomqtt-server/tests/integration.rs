@@ -228,3 +228,102 @@ async fn mqtt_snapshot_burst() {
     let mut s = TcpStream::connect(format!("127.0.0.1:{}", ports.resp)).unwrap();
     resp_command(&mut s, &["DEL", &set, &format!("obj:{member}")]);
 }
+
+#[tokio::test]
+async fn hset_fans_out_attr_to_tile() {
+    let Some(redis_url) = maybe_redis() else {
+        eprintln!("skip hset_fans_out_attr_to_tile: GEOMQTT_TEST_REDIS_URL not set");
+        return;
+    };
+    let ports = Ports {
+        resp: 26382,
+        mqtt: 21885,
+        ws: 28085,
+        http: 28082,
+    };
+    let _guard = spawn_server(&redis_url, ports);
+    assert!(
+        wait_for_http(ports.http, Duration::from_secs(10)),
+        "server never bound HTTP"
+    );
+
+    let set = format!("attr-{}", std::process::id());
+    let member = format!("veh-{}", std::process::id());
+
+    // Seed the position so the inset set membership is recorded.
+    {
+        let mut s = TcpStream::connect(format!("127.0.0.1:{}", ports.resp)).unwrap();
+        resp_command(&mut s, &["GEOADD", &set, "11.34", "44.49", &member]);
+    }
+
+    // Subscribe to the containing tile (z=10 → 544/370). Drain the snapshot
+    // so we don't confuse it with the post-subscribe attr message we're after.
+    let mut opts = rumqttc::MqttOptions::new("attr-test", "127.0.0.1", ports.mqtt);
+    opts.set_keep_alive(Duration::from_secs(5));
+    let (client, mut eventloop) = rumqttc::AsyncClient::new(opts, 16);
+    let topic = format!("geo/{set}/10/544/370");
+    client
+        .subscribe(&topic, rumqttc::QoS::AtMostOnce)
+        .await
+        .unwrap();
+
+    let drain_deadline = Instant::now() + Duration::from_secs(3);
+    while Instant::now() < drain_deadline {
+        let poll = tokio::time::timeout(Duration::from_millis(300), eventloop.poll()).await;
+        if let Ok(Ok(rumqttc::Event::Incoming(rumqttc::Packet::Publish(p)))) = poll {
+            if let Ok(v) = serde_json::from_slice::<serde_json::Value>(&p.payload) {
+                if v["op"] == "snapshot" && v["id"] == member.as_str() {
+                    break;
+                }
+            }
+        }
+    }
+
+    // Now HSET should fan an `attr` message into the same tile, carrying
+    // only the enrich_attrs-listed fields (icon,color in spawn_server).
+    {
+        let mut s = TcpStream::connect(format!("127.0.0.1:{}", ports.resp)).unwrap();
+        resp_command(
+            &mut s,
+            &[
+                "HSET",
+                &format!("obj:{member}"),
+                "icon",
+                "ship",
+                "color",
+                "blue",
+                "description", // not in enrich_attrs — must be filtered out
+                "long string value",
+            ],
+        );
+    }
+
+    let deadline = Instant::now() + Duration::from_secs(10);
+    let mut got_attr = false;
+    while Instant::now() < deadline {
+        let poll = tokio::time::timeout(Duration::from_millis(500), eventloop.poll()).await;
+        match poll {
+            Ok(Ok(rumqttc::Event::Incoming(rumqttc::Packet::Publish(p)))) => {
+                if let Ok(v) = serde_json::from_slice::<serde_json::Value>(&p.payload) {
+                    if v["op"] == "attr" && v["id"] == member.as_str() {
+                        assert_eq!(v["attrs"]["icon"], "ship");
+                        assert_eq!(v["attrs"]["color"], "blue");
+                        assert!(
+                            v["attrs"].get("description").is_none(),
+                            "non-enriched field leaked onto tile: {v}"
+                        );
+                        got_attr = true;
+                        break;
+                    }
+                }
+            }
+            Ok(_) | Err(_) => continue,
+        }
+    }
+    assert!(got_attr, "no attr message received on {topic}");
+
+    // Cleanup.
+    let mut s = TcpStream::connect(format!("127.0.0.1:{}", ports.resp)).unwrap();
+    resp_command(&mut s, &["DEL", &set, &format!("obj:{member}")]);
+    resp_command(&mut s, &["DEL", &format!("gmq:inset:{member}")]);
+}
