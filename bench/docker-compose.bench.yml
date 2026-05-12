@@ -1,0 +1,80 @@
+# Benchmark stack — Redis + geomqtt + the bench harness as a third
+# service. The harness only runs on explicit invocation:
+#
+#   docker compose -f bench/docker-compose.bench.yml up -d redis geomqtt
+#   docker compose -f bench/docker-compose.bench.yml run --rm bench smoke
+#   docker compose -f bench/docker-compose.bench.yml run --rm bench all
+#   docker compose -f bench/docker-compose.bench.yml run --rm bench analyze
+#
+# Results land in ./bench/results/ on the host via a volume mount.
+
+services:
+  redis:
+    image: redis:7-alpine
+    command: redis-server --save "" --appendonly no --loglevel warning
+    # Disable persistence — we want pure in-memory perf for benchmarks.
+    # No host port mapping: the bench harness connects via the compose
+    # network DNS name `redis`. Uncomment to expose on the host.
+    # ports:
+    #   - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 1s
+      retries: 5
+
+  geomqtt:
+    # Pin to a specific tag for reproducibility. Bump when benchmarking
+    # a new release; record the tag in the JSON summary (geomqtt /config
+    # exposes the effective settings, which are captured per run).
+    image: ghcr.io/openfantasymap/geomqtt:latest
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      GEOMQTT_REDIS_URL:    redis://redis:6379
+      GEOMQTT_RESP_ADDR:    0.0.0.0:6380
+      GEOMQTT_MQTT_ADDR:    0.0.0.0:1883
+      GEOMQTT_MQTT_WS_ADDR: 0.0.0.0:8083
+      GEOMQTT_HTTP_ADDR:    0.0.0.0:8080
+      GEOMQTT_ENRICH_ZOOMS: "6-12"
+      GEOMQTT_TILE_SIZE:    "256"
+      GEOMQTT_ENRICH_ATTRS: "icon,color"
+      RUST_LOG:             "warn"
+    # No host port mapping: the bench harness connects via the compose
+    # network DNS name `geomqtt`. Uncomment to expose on the host if you
+    # want to point external clients at this bench geomqtt.
+    # ports:
+    #   - "6380:6380"   # RESP
+    #   - "1883:1883"   # MQTT TCP
+    #   - "8083:8083"   # MQTT WebSocket
+    #   - "8080:8080"   # HTTP (GeoJSON + /config + /status + /healthz)
+    healthcheck:
+      # The geomqtt image is a slim Debian without wget/curl; use a
+      # bash /dev/tcp probe against the HTTP listener instead.
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8080"]
+      interval: 2s
+      timeout: 1s
+      retries: 10
+
+  bench:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: geomqtt-bench:local
+    # The bench is invoked via `docker compose run --rm bench <scenario>`
+    # for one-off scenarios, not as a long-running service.
+    depends_on:
+      geomqtt:
+        condition: service_healthy
+    environment:
+      # Hosts default to the in-cluster service name. Override per-run
+      # via `-e GEOMQTT_BENCH_RESP_HOST=otherhost:6380` if you need to
+      # bench an external geomqtt.
+      GEOMQTT_BENCH_RESP_HOST:    geomqtt:6380
+      GEOMQTT_BENCH_MQTT_HOST:    geomqtt:1883
+      GEOMQTT_BENCH_MQTT_WS_HOST: geomqtt:8083
+      GEOMQTT_BENCH_HTTP_HOST:    geomqtt:8080
+      GEOMQTT_BENCH_RESULTS_DIR:  /results
+    volumes:
+      - ./results:/results
