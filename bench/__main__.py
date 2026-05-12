@@ -27,6 +27,7 @@ import os
 import typer
 
 from bench.scenarios import (
+    cross_node,
     fanout,
     snapshot_burst,
     viewport_churn,
@@ -180,6 +181,38 @@ def viewport_churn_cmd(
     )
 
 
+@app.command("cross-node-fanout")
+def cross_node_fanout_cmd(
+    writer_resp_host: str = "",
+    writer_http_host: str = "",
+    subscriber_mqtt_hosts: str = "",
+    duration: int = 60,
+    warmup: int = 5,
+    subscribers: int = 99,
+    publish_rate: int = 50,
+    set_name: str = "bench-xnode",
+    results_dir: str = _DEFAULT_RESULTS,
+) -> None:
+    """Multi-node fan-out: writer on one node, subscribers split across N nodes.
+
+    Reports local vs cross-node fan-out latency separately and the bridge
+    overhead between them. Reads writer + subscriber-host defaults from env
+    (``GEOMQTT_BENCH_WRITER_RESP_HOST`` etc.) when CLI flags are empty.
+    """
+    cfg = _config(
+        duration=duration, warmup=warmup, results_dir=results_dir,
+    )
+    cross_node.run(
+        cfg,
+        subscribers=subscribers,
+        publish_rate=publish_rate,
+        set_name=set_name,
+        writer_resp_host=writer_resp_host or None,
+        writer_http_host=writer_http_host or None,
+        subscriber_mqtt_hosts=subscriber_mqtt_hosts or None,
+    )
+
+
 @app.command("smoke")
 def smoke_cmd(
     resp_host: str = _DEFAULT_RESP,
@@ -200,6 +233,10 @@ def smoke_cmd(
     viewport_churn.run(cfg, clients=20, churn_interval_ms=500,
                        viewport_tiles=4, set_name="bench-smoke",
                        object_count=500)
+    # cross-node only meaningful when multi-node env vars are set; the
+    # scenario degenerates to a single-node fanout otherwise.
+    cross_node.run(cfg, subscribers=9, publish_rate=20,
+                   set_name="bench-smoke")
 
 
 @app.command("all")
@@ -225,6 +262,8 @@ def all_cmd(
     viewport_churn.run(cfg, clients=200, churn_interval_ms=1000,
                        viewport_tiles=9, set_name="bench-churn",
                        object_count=5_000)
+    cross_node.run(cfg, subscribers=99, publish_rate=50,
+                   set_name="bench-xnode")
 
 
 @app.command("analyze")

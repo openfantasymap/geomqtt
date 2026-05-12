@@ -1,0 +1,82 @@
+# Multi-node benchmark stack — 1 Redis + 3 geomqtt instances + bench.
+#
+# All three geomqtt instances point at the same upstream Redis, so the
+# cross-node pub/sub bridge is active across all of them. The bench
+# harness addresses each node directly by service name; there is no
+# load balancer in the topology because we want per-node observations.
+#
+# Usage:
+#   docker compose -f bench/docker-compose.multinode.yml up -d \
+#     redis geomqtt-1 geomqtt-2 geomqtt-3
+#   docker compose -f bench/docker-compose.multinode.yml run --rm bench \
+#     cross-node-fanout
+#   docker compose -f bench/docker-compose.multinode.yml down
+
+x-geomqtt-base: &geomqtt-base
+  image: ghcr.io/openfantasymap/geomqtt:latest
+  environment: &geomqtt-env
+    GEOMQTT_REDIS_URL:    redis://redis:6379
+    GEOMQTT_RESP_ADDR:    0.0.0.0:6380
+    GEOMQTT_MQTT_ADDR:    0.0.0.0:1883
+    GEOMQTT_MQTT_WS_ADDR: 0.0.0.0:8083
+    GEOMQTT_HTTP_ADDR:    0.0.0.0:8080
+    GEOMQTT_ENRICH_ZOOMS: "6-12"
+    GEOMQTT_TILE_SIZE:    "256"
+    GEOMQTT_ENRICH_ATTRS: "icon,color"
+    RUST_LOG:             "warn"
+  healthcheck:
+    test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8080"]
+    interval: 2s
+    timeout: 1s
+    retries: 10
+  depends_on:
+    redis:
+      condition: service_healthy
+
+services:
+  redis:
+    image: redis:7-alpine
+    command: redis-server --save "" --appendonly no --loglevel warning
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 1s
+      retries: 5
+
+  geomqtt-1:
+    <<: *geomqtt-base
+
+  geomqtt-2:
+    <<: *geomqtt-base
+
+  geomqtt-3:
+    <<: *geomqtt-base
+
+  bench:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: geomqtt-bench:local
+    depends_on:
+      geomqtt-1:
+        condition: service_healthy
+      geomqtt-2:
+        condition: service_healthy
+      geomqtt-3:
+        condition: service_healthy
+    environment:
+      # Writer node — RESP + HTTP go here.
+      GEOMQTT_BENCH_WRITER_RESP_HOST: geomqtt-1:6380
+      GEOMQTT_BENCH_WRITER_HTTP_HOST: geomqtt-1:8080
+      # Subscriber nodes — comma-separated; bench splits subs across these.
+      GEOMQTT_BENCH_SUBSCRIBER_MQTT_HOSTS: "geomqtt-1:1883,geomqtt-2:1883,geomqtt-3:1883"
+      # Default the single-node BENCH_* hosts to geomqtt-1 so existing
+      # single-node subcommands still work against this compose if the
+      # operator invokes them.
+      GEOMQTT_BENCH_RESP_HOST:    geomqtt-1:6380
+      GEOMQTT_BENCH_MQTT_HOST:    geomqtt-1:1883
+      GEOMQTT_BENCH_MQTT_WS_HOST: geomqtt-1:8083
+      GEOMQTT_BENCH_HTTP_HOST:    geomqtt-1:8080
+      GEOMQTT_BENCH_RESULTS_DIR:  /results
+    volumes:
+      - ./results:/results

@@ -273,6 +273,24 @@ def analyze_results(results_dir: str) -> None:
                     f"{s.get('churn_rate_sustained', '—'):.0f} | "
                     f"{s.get('steady_state_subs', '—')} |"
                 )
+        elif scenario == "cross-node-fanout":
+            lines.append(
+                "| Run | subs | nodes | local P50 / P95 / P99 | cross P50 / P95 / P99 | bridge overhead P50 |"
+            )
+            lines.append("|---|---|---|---|---|---|")
+            for s in runs:
+                local = s.get("local_fanout_ms", {})
+                cross = s.get("cross_fanout_ms", {})
+                bridge = s.get("bridge_overhead_ms_p50", None)
+                nodes = s.get("subscriber_nodes", [])
+                bridge_str = f"{bridge:.2f}" if bridge is not None else "—"
+                lines.append(
+                    f"| `{s['run_id']}` | {s.get('subscribers', '—')} | "
+                    f"{len(set(nodes))} | "
+                    f"{local.get('p50', '—'):.2f} / {local.get('p95', '—'):.2f} / {local.get('p99', '—'):.2f} | "
+                    f"{cross.get('p50', '—'):.2f} / {cross.get('p95', '—'):.2f} / {cross.get('p99', '—'):.2f} | "
+                    f"{bridge_str} |"
+                )
         else:
             lines.append(f"_Unknown scenario; raw runs:_ {len(runs)}")
         lines.append("")
