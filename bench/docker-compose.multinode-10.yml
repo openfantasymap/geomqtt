@@ -1,0 +1,85 @@
+# 10-node multi-node benchmark stack — 1 Redis + 10 geomqtt instances + bench.
+#
+# Same topology as docker-compose.multinode.yml but with 10 geomqtt
+# nodes instead of 3, used to characterise how the Redis pub/sub
+# bridge overhead scales with node count under matched per-node load.
+#
+# Usage:
+#   docker compose -f bench/docker-compose.multinode-10.yml up -d \
+#     redis geomqtt-1 geomqtt-2 geomqtt-3 geomqtt-4 geomqtt-5 \
+#     geomqtt-6 geomqtt-7 geomqtt-8 geomqtt-9 geomqtt-10
+#   docker compose -f bench/docker-compose.multinode-10.yml run --rm bench \
+#     cross-node-fanout --duration 60 --subscribers 330 --publish-rate 50
+#   docker compose -f bench/docker-compose.multinode-10.yml down
+
+x-geomqtt-base: &geomqtt-base
+  image: ghcr.io/openfantasymap/geomqtt:latest
+  environment:
+    GEOMQTT_REDIS_URL:    redis://redis:6379
+    GEOMQTT_RESP_ADDR:    0.0.0.0:6380
+    GEOMQTT_MQTT_ADDR:    0.0.0.0:1883
+    GEOMQTT_MQTT_WS_ADDR: 0.0.0.0:8083
+    GEOMQTT_HTTP_ADDR:    0.0.0.0:8080
+    GEOMQTT_ENRICH_ZOOMS: "6-12"
+    GEOMQTT_TILE_SIZE:    "256"
+    GEOMQTT_ENRICH_ATTRS: "icon,color"
+    RUST_LOG:             "warn"
+  healthcheck:
+    test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8080"]
+    interval: 2s
+    timeout: 1s
+    retries: 10
+  depends_on:
+    redis:
+      condition: service_healthy
+
+services:
+  redis:
+    image: redis:7-alpine
+    command: redis-server --save "" --appendonly no --loglevel warning
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 1s
+      retries: 5
+
+  geomqtt-1:   {<<: *geomqtt-base}
+  geomqtt-2:   {<<: *geomqtt-base}
+  geomqtt-3:   {<<: *geomqtt-base}
+  geomqtt-4:   {<<: *geomqtt-base}
+  geomqtt-5:   {<<: *geomqtt-base}
+  geomqtt-6:   {<<: *geomqtt-base}
+  geomqtt-7:   {<<: *geomqtt-base}
+  geomqtt-8:   {<<: *geomqtt-base}
+  geomqtt-9:   {<<: *geomqtt-base}
+  geomqtt-10:  {<<: *geomqtt-base}
+
+  bench:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: geomqtt-bench:local
+    depends_on:
+      geomqtt-1:  {condition: service_healthy}
+      geomqtt-2:  {condition: service_healthy}
+      geomqtt-3:  {condition: service_healthy}
+      geomqtt-4:  {condition: service_healthy}
+      geomqtt-5:  {condition: service_healthy}
+      geomqtt-6:  {condition: service_healthy}
+      geomqtt-7:  {condition: service_healthy}
+      geomqtt-8:  {condition: service_healthy}
+      geomqtt-9:  {condition: service_healthy}
+      geomqtt-10: {condition: service_healthy}
+    environment:
+      GEOMQTT_BENCH_WRITER_RESP_HOST: geomqtt-1:6380
+      GEOMQTT_BENCH_WRITER_HTTP_HOST: geomqtt-1:8080
+      GEOMQTT_BENCH_SUBSCRIBER_MQTT_HOSTS: "geomqtt-1:1883,geomqtt-2:1883,geomqtt-3:1883,geomqtt-4:1883,geomqtt-5:1883,geomqtt-6:1883,geomqtt-7:1883,geomqtt-8:1883,geomqtt-9:1883,geomqtt-10:1883"
+      # Single-node BENCH_* hosts default to geomqtt-1 so single-node
+      # subcommands still work if invoked against this compose.
+      GEOMQTT_BENCH_RESP_HOST:    geomqtt-1:6380
+      GEOMQTT_BENCH_MQTT_HOST:    geomqtt-1:1883
+      GEOMQTT_BENCH_MQTT_WS_HOST: geomqtt-1:8083
+      GEOMQTT_BENCH_HTTP_HOST:    geomqtt-1:8080
+      GEOMQTT_BENCH_RESULTS_DIR:  /results
+    volumes:
+      - ./results:/results
